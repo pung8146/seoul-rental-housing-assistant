@@ -6,7 +6,7 @@ import {
   parseNumber,
   parseTags,
 } from '../src/domain/normalize.js';
-import { createLhAdapter, parseLhNoticeListHtml } from '../src/adapters/lh.js';
+import { createLhAdapter, parseLhNoticeListHtml, type CreateLhAdapterOptions } from '../src/adapters/lh.js';
 import { createShAdapter } from '../src/adapters/sh.js';
 import { ListingSchema, NoticeSchema } from '../src/types.js';
 
@@ -164,6 +164,82 @@ describe('adapter contract', () => {
               rawIds: {
                 dataId1: '12345',
                 dataId2: 'A1',
+              },
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('fetches live LH notice HTML with an injected fetch implementation', async () => {
+    const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <button
+                type="button"
+                class="wrtancInfoBtn"
+                data-id1="67890"
+                data-id2="B2"
+              >상세보기</button>
+            </td>
+            <td class="al">경기 신혼부부 전세임대 모집</td>
+            <td>전세임대</td>
+            <td>경기도</td>
+            <td>2026-05-03</td>
+            <td>2026-05-22</td>
+            <td>공고중</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    const fetchCalls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const fetchImpl: NonNullable<CreateLhAdapterOptions['fetch']> = async (input, init) => {
+      fetchCalls.push({ input, init });
+      return new Response(html, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    };
+
+    const adapter = createLhAdapter({ fetch: fetchImpl });
+    expect(adapter.source).toBe('lh');
+
+    const notices = await adapter.fetchNotices();
+    expect(fetchCalls).toEqual([
+      {
+        input: 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?mi=1026',
+        init: undefined,
+      },
+    ]);
+
+    expect(notices).toEqual([
+      {
+        sourceId: '67890',
+        title: '경기 신혼부부 전세임대 모집',
+        status: '공고중',
+        region: '경기도',
+        postedAt: '2026-05-03',
+        applicationEndAt: '2026-05-22',
+        metadata: {
+          provider: 'LH',
+          rawIds: {
+            dataId1: '67890',
+            dataId2: 'B2',
+          },
+        },
+        listings: [
+          {
+            title: '경기 신혼부부 전세임대 모집',
+            supplyType: '전세임대',
+            region: '경기도',
+            status: '공고중',
+            metadata: {
+              rawIds: {
+                dataId1: '67890',
+                dataId2: 'B2',
               },
             },
           },

@@ -1,6 +1,13 @@
 import type { RawNoticeCandidate, SourceAdapter } from './base.js';
 
 const LH_PROVIDER = 'LH';
+const LH_NOTICE_LIST_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?mi=1026';
+
+type LhFetch = typeof fetch;
+
+export type CreateLhAdapterOptions = {
+  fetch?: LhFetch;
+};
 
 const extractCells = (rowHtml: string): string[] => {
   const matches = Array.from(rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi));
@@ -83,14 +90,19 @@ const LH_FIXTURE: RawNoticeCandidate[] = [
   },
 ];
 
-export const createLhAdapter = (): SourceAdapter => ({
-  source: 'lh',
-  async fetchNotices() {
-    return LH_FIXTURE;
-  },
-  async fetchNoticeDetails(id: string) {
-    return LH_FIXTURE.find((notice) => notice.sourceId === id) ?? null;
-  },
-});
+export const createLhAdapter = (options: CreateLhAdapterOptions = {}): SourceAdapter => {
+  const fetchImpl = options.fetch ?? fetch;
 
-// TODO: Replace fixture-backed adapter with live LH endpoint wiring.
+  return {
+    source: 'lh',
+    async fetchNotices() {
+      const response = await fetchImpl(LH_NOTICE_LIST_URL);
+      const html = await response.text();
+      return parseLhNoticeListHtml(html);
+    },
+    async fetchNoticeDetails(id: string) {
+      // TODO: Fetch and parse the LH detail page for individual notice records.
+      return LH_FIXTURE.find((notice) => notice.sourceId === id) ?? null;
+    },
+  };
+};
