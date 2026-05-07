@@ -1,0 +1,67 @@
+import { z } from 'zod';
+
+const NullableString = z.string().min(1).nullable();
+const NullableNumber = z.number().finite().nullable();
+const JsonRecord = z.record(z.string(), z.unknown());
+
+export const NoticeSchema = z.object({
+  source: z.string().min(1),
+  sourceId: z.string().min(1),
+  title: z.string().min(1),
+  stableKey: z.string().min(1),
+  changeHash: z.string().min(1),
+  status: NullableString,
+  region: NullableString,
+  targetTags: z.array(z.string()),
+  postedAt: NullableString,
+  applicationStartAt: NullableString,
+  applicationEndAt: NullableString,
+  sourceUrl: NullableString,
+  metadata: JsonRecord,
+});
+
+export const ListingSchema = z.object({
+  source: z.string().min(1),
+  noticeSourceId: z.string().min(1),
+  title: z.string().min(1),
+  stableKey: z.string().min(1),
+  changeHash: z.string().min(1),
+  supplyType: NullableString,
+  region: NullableString,
+  targetTags: z.array(z.string()),
+  deposit: NullableNumber,
+  monthlyRent: NullableNumber,
+  floorAreaM2: NullableNumber,
+  status: NullableString,
+  metadata: JsonRecord,
+});
+
+export const SourceRunSchema = z.object({
+  source: z.string().min(1),
+  startedAt: z.string().min(1),
+  finishedAt: z.string().min(1),
+  status: z.enum(['success', 'partial', 'failure']),
+  message: NullableString,
+});
+
+export const NotificationEventSchema = z.object({
+  type: z.enum(['new_notice', 'listing_added', 'listing_changed']),
+  notice: NoticeSchema,
+  listing: ListingSchema.nullable(),
+  occurredAt: z.string().min(1),
+});
+
+export const QueryFiltersSchema = z.object({
+  source: z.string().min(1).nullable().optional(),
+  region: z.string().min(1).nullable().optional(),
+  status: z.string().min(1).nullable().optional(),
+  targetTags: z.array(z.string()).optional(),
+  postedAfter: z.string().min(1).nullable().optional(),
+  postedBefore: z.string().min(1).nullable().optional(),
+});
+
+export type Notice = z.infer<typeof NoticeSchema>;
+export type Listing = z.infer<typeof ListingSchema>;
+export type SourceRun = z.infer<typeof SourceRunSchema>;
+export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
+export type QueryFilters = z.infer<typeof QueryFiltersSchema>;
