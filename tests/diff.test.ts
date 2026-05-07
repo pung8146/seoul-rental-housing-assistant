@@ -83,8 +83,12 @@ describe('diffNoticeAndListings', () => {
     });
   });
 
-  it('emits listing_changed when a stable listing changes content', () => {
-    const incomingNotice = makeNotice();
+  it('emits listing_changed with previous and current listing payloads', () => {
+    const incomingNotice = makeNotice({
+      changeHash: 'notice-hash-2',
+      title: '서울 청년 임대주택 모집 수정',
+    });
+    const existingNotice = makeNotice();
     const previousListing = makeListing();
     const changedListing = makeListing({
       changeHash: 'listing-hash-2',
@@ -94,7 +98,7 @@ describe('diffNoticeAndListings', () => {
     const events = diffNoticeAndListings({
       incomingNotice,
       incomingListings: [changedListing],
-      existingNotice: makeNotice(),
+      existingNotice,
       existingListings: [previousListing],
     });
 
@@ -103,6 +107,8 @@ describe('diffNoticeAndListings', () => {
       type: 'listing_changed',
       notice: incomingNotice,
       listing: changedListing,
+      previousNotice: existingNotice,
+      previousListing,
     });
   });
 

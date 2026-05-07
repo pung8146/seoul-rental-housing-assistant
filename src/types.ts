@@ -48,6 +48,8 @@ export const NotificationEventSchema = z.object({
   type: z.enum(['new_notice', 'listing_added', 'listing_changed']),
   notice: NoticeSchema,
   listing: ListingSchema.nullable(),
+  previousNotice: NoticeSchema.nullable().optional(),
+  previousListing: ListingSchema.nullable().optional(),
   occurredAt: z.string().min(1),
 });
 

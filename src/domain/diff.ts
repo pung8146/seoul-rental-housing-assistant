@@ -11,10 +11,14 @@ const createEvent = (
   type: NotificationEvent['type'],
   notice: Notice,
   listing: Listing | null,
+  previousNotice?: Notice | null,
+  previousListing?: Listing | null,
 ): NotificationEvent => ({
   type,
   notice,
   listing,
+  previousNotice,
+  previousListing,
   occurredAt: new Date().toISOString(),
 });
 
@@ -43,7 +47,15 @@ export const diffNoticeAndListings = ({
     }
 
     if (existingListing.changeHash !== incomingListing.changeHash) {
-      events.push(createEvent('listing_changed', incomingNotice, incomingListing));
+      events.push(
+        createEvent(
+          'listing_changed',
+          incomingNotice,
+          incomingListing,
+          existingNotice,
+          existingListing,
+        ),
+      );
     }
   }
 
