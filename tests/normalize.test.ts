@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  normalizeAdapterOutput,
+  normalizeRegion,
+  parseNumber,
+  parseTags,
+} from '../src/domain/normalize';
 import { ListingSchema, NoticeSchema } from '../src/types';
 
 describe('core domain schemas', () => {
@@ -78,5 +84,93 @@ describe('core domain schemas', () => {
         expect.arrayContaining(['source', 'title', 'stableKey', 'changeHash']),
       );
     }
+  });
+});
+
+describe('normalization helpers', () => {
+  it('maps raw adapter output into notice and listing arrays', () => {
+    const result = normalizeAdapterOutput({
+      source: 'lh',
+      notices: [
+        {
+          sourceId: 'notice-1',
+          title: ' 서울특별시 청년 임대주택 모집 ',
+          status: ' 모집중 ',
+          region: '서울특별시',
+          targetTags: '청년, 신혼부부',
+          postedAt: '2026-05-07',
+          applicationStartAt: '',
+          applicationEndAt: undefined,
+          sourceUrl: 'https://example.com/notices/1',
+          metadata: { provider: 'LH' },
+          listings: [
+            {
+              title: ' 101동 201호 ',
+              supplyType: ' 행복주택 ',
+              region: '서울특별시',
+              targetTags: ['청년', ' 신혼부부 '],
+              deposit: '10,000,000',
+              monthlyRent: '250,000',
+              floorAreaM2: '39.8',
+              status: ' 공급중 ',
+              metadata: { building: '101동', unit: '201호' },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.notices).toHaveLength(1);
+    expect(result.listings).toHaveLength(1);
+    expect(NoticeSchema.parse(result.notices[0]).region).toBe('서울');
+    expect(NoticeSchema.parse(result.notices[0]).targetTags).toEqual(['청년', '신혼부부']);
+
+    const listing = ListingSchema.parse(result.listings[0]);
+    expect(listing.noticeSourceId).toBe('notice-1');
+    expect(listing.deposit).toBe(10000000);
+    expect(listing.monthlyRent).toBe(250000);
+    expect(listing.floorAreaM2).toBe(39.8);
+    expect(listing.stableKey).toBeTruthy();
+    expect(listing.changeHash).toBeTruthy();
+  });
+
+  it('converts missing optional values to null instead of undefined', () => {
+    const result = normalizeAdapterOutput({
+      source: 'sh',
+      notices: [
+        {
+          sourceId: 'notice-2',
+          title: '경기도 매입임대',
+          listings: [
+            {
+              title: 'A-1',
+            },
+          ],
+        },
+      ],
+    });
+
+    const notice = NoticeSchema.parse(result.notices[0]);
+    const listing = ListingSchema.parse(result.listings[0]);
+
+    expect(notice.status).toBeNull();
+    expect(notice.region).toBeNull();
+    expect(notice.applicationStartAt).toBeNull();
+    expect(notice.applicationEndAt).toBeNull();
+    expect(notice.sourceUrl).toBeNull();
+    expect(listing.supplyType).toBeNull();
+    expect(listing.region).toBeNull();
+    expect(listing.deposit).toBeNull();
+    expect(listing.monthlyRent).toBeNull();
+    expect(listing.floorAreaM2).toBeNull();
+    expect(listing.status).toBeNull();
+  });
+
+  it('normalizes region text like 서울특별시 to 서울', () => {
+    expect(normalizeRegion('서울특별시')).toBe('서울');
+    expect(normalizeRegion(' 경기도 ')).toBe('경기');
+    expect(normalizeRegion('')).toBeNull();
+    expect(parseNumber('12,345')).toBe(12345);
+    expect(parseTags('청년 / 신혼부부, 대학생')).toEqual(['청년', '신혼부부', '대학생']);
   });
 });
