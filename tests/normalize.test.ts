@@ -6,6 +6,8 @@ import {
   parseNumber,
   parseTags,
 } from '../src/domain/normalize';
+import { createLhAdapter } from '../src/adapters/lh';
+import { createShAdapter } from '../src/adapters/sh';
 import { ListingSchema, NoticeSchema } from '../src/types';
 
 describe('core domain schemas', () => {
@@ -83,6 +85,33 @@ describe('core domain schemas', () => {
       expect(result.error.issues.map((issue) => issue.path.join('.'))).toEqual(
         expect.arrayContaining(['source', 'title', 'stableKey', 'changeHash']),
       );
+    }
+  });
+});
+
+describe('adapter contract', () => {
+  it('returns raw notice and listing candidate records in a shared shape for each adapter', async () => {
+    const adapters = [createLhAdapter(), createShAdapter()];
+
+    for (const adapter of adapters) {
+      const notices = await adapter.fetchNotices();
+
+      expect(Array.isArray(notices)).toBe(true);
+      expect(notices.length).toBeGreaterThan(0);
+
+      for (const notice of notices) {
+        expect(typeof notice.sourceId).toBe('string');
+        expect(notice.sourceId.length).toBeGreaterThan(0);
+        expect(typeof notice.title).toBe('string');
+        expect(notice.title.length).toBeGreaterThan(0);
+        expect(Array.isArray(notice.listings)).toBe(true);
+        expect(notice.listings.length).toBeGreaterThan(0);
+
+        for (const listing of notice.listings) {
+          expect(typeof listing.title).toBe('string');
+          expect(listing.title.length).toBeGreaterThan(0);
+        }
+      }
     }
   });
 });
