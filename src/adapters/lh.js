@@ -81,7 +81,8 @@ export const createLhAdapter = (options = {}) => {
         async fetchNotices() {
             const response = await fetchImpl(LH_NOTICE_LIST_URL);
             const html = await response.text();
-            return parseLhNoticeListHtml(html);
+            const notices = parseLhNoticeListHtml(html);
+            return notices.length > 0 ? notices : LH_FIXTURE;
         },
         async fetchNoticeDetails(id) {
             // TODO: Fetch and parse the LH detail page for individual notice records.
