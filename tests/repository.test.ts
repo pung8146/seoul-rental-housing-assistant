@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { createRepository } from '../src/db/repository';
+import { runCollect } from '../src/app/run-collect';
+import type { SourceAdapter } from '../src/adapters/base';
 import type { Listing, Notice } from '../src/types';
 
 const makeNotice = (overrides: Partial<Notice> = {}): Notice => ({
@@ -98,5 +100,113 @@ describe('sqlite repository', () => {
         message: 'network timeout',
       },
     ]);
+  });
+
+  it('runs collection across adapters, persists output, emits events, and keeps partial failures', async () => {
+    const repository = createRepository(':memory:');
+    const primaryAdapter: SourceAdapter = {
+      source: 'lh',
+      async fetchNotices() {
+        return [
+          {
+            sourceId: 'notice-1',
+            title: '서울 청년 임대주택 모집',
+            region: '서울특별시',
+            targetTags: ['청년'],
+            postedAt: '2026-05-07',
+            sourceUrl: 'https://example.com/notices/1',
+            listings: [
+              {
+                title: '101동 201호',
+                supplyType: '행복주택',
+                region: '서울특별시',
+                targetTags: ['청년'],
+                deposit: 10000000,
+                monthlyRent: 250000,
+                floorAreaM2: 39.8,
+                status: 'available',
+                metadata: { unit: '201호' },
+              },
+            ],
+          },
+        ];
+      },
+    };
+    const failingAdapter: SourceAdapter = {
+      source: 'sh',
+      async fetchNotices() {
+        throw new Error('adapter offline');
+      },
+    };
+
+    const firstRun = await runCollect({
+      adapters: [primaryAdapter, failingAdapter],
+      repository,
+    });
+
+    expect(firstRun.events).toHaveLength(1);
+    expect(firstRun.events[0]).toMatchObject({
+      type: 'new_notice',
+      notice: expect.objectContaining({ source: 'lh', sourceId: 'notice-1' }),
+      listing: null,
+    });
+    expect(firstRun.failures).toEqual([{ source: 'sh', message: 'adapter offline' }]);
+    expect(repository.findNoticeBySourceId('lh', 'notice-1')).toMatchObject({
+      title: '서울 청년 임대주택 모집',
+      region: '서울',
+    });
+    expect(repository.queryListingsByNotice('lh', 'notice-1')).toHaveLength(1);
+    expect(repository.listListingSnapshots()).toHaveLength(0);
+    expect(repository.listSourceRuns()).toMatchObject([
+      expect.objectContaining({ source: 'lh', status: 'success', message: null }),
+      expect.objectContaining({ source: 'sh', status: 'failure', message: 'adapter offline' }),
+    ]);
+
+    const changedAdapter: SourceAdapter = {
+      source: 'lh',
+      async fetchNotices() {
+        return [
+          {
+            sourceId: 'notice-1',
+            title: '서울 청년 임대주택 모집',
+            region: '서울특별시',
+            targetTags: ['청년'],
+            postedAt: '2026-05-07',
+            sourceUrl: 'https://example.com/notices/1',
+            listings: [
+              {
+                title: '101동 201호',
+                supplyType: '행복주택',
+                region: '서울특별시',
+                targetTags: ['청년'],
+                deposit: 10000000,
+                monthlyRent: 270000,
+                floorAreaM2: 39.8,
+                status: 'available',
+                metadata: { unit: '201호' },
+              },
+            ],
+          },
+        ];
+      },
+    };
+
+    const secondRun = await runCollect({
+      adapters: [changedAdapter],
+      repository,
+    });
+
+    expect(secondRun.failures).toEqual([]);
+    expect(secondRun.events).toHaveLength(1);
+    expect(secondRun.events[0]).toMatchObject({
+      type: 'listing_changed',
+      listing: expect.objectContaining({ monthlyRent: 270000 }),
+      previousListing: expect.objectContaining({ monthlyRent: 250000 }),
+    });
+    expect(repository.listListingSnapshots()).toHaveLength(1);
+    expect(repository.listListingSnapshots()[0]).toMatchObject({
+      listingStableKey: secondRun.events[0]?.listing?.stableKey,
+      changeHash: secondRun.events[0]?.listing?.changeHash,
+    });
   });
 });

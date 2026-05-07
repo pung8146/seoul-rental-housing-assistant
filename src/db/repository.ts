@@ -41,6 +41,12 @@ type SourceRunRow = {
   message: string | null;
 };
 
+type ListingSnapshotRow = {
+  listing_stable_key: string;
+  change_hash: string;
+  payload_json: string;
+};
+
 const serializeArray = (value: string[]) => JSON.stringify(value);
 const serializeObject = (value: Record<string, unknown>) => JSON.stringify(value);
 const parseArray = (value: string) => JSON.parse(value) as string[];
@@ -211,6 +217,18 @@ export const createRepository = (filename: string, database = createDatabase(fil
           finishedAt: (row as SourceRunRow).finished_at,
           status: (row as SourceRunRow).status,
           message: (row as SourceRunRow).message,
+        }));
+    },
+    listListingSnapshots() {
+      return database
+        .prepare(
+          'SELECT listing_stable_key, change_hash, payload_json FROM listing_snapshots ORDER BY id ASC',
+        )
+        .all()
+        .map((row) => ({
+          listingStableKey: (row as ListingSnapshotRow).listing_stable_key,
+          changeHash: (row as ListingSnapshotRow).change_hash,
+          payload: JSON.parse((row as ListingSnapshotRow).payload_json) as Listing,
         }));
     },
     queryNotices(filters: QueryFilters) {

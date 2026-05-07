@@ -1,6 +1,6 @@
 import type { Listing, NotificationEvent, Notice } from '../types';
 
-type DiffNoticeAndListingsInput = {
+export type DiffNoticeAndListingsInput = {
   incomingNotice: Notice;
   incomingListings: Listing[];
   existingNotice: Notice | null;
@@ -61,3 +61,6 @@ export const diffNoticeAndListings = ({
 
   return events;
 };
+
+export const shouldSnapshotListingEvent = (event: NotificationEvent): boolean =>
+  event.type === 'listing_added' || event.type === 'listing_changed';
