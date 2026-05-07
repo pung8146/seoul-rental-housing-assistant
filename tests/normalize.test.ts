@@ -6,7 +6,7 @@ import {
   parseNumber,
   parseTags,
 } from '../src/domain/normalize.js';
-import { createLhAdapter } from '../src/adapters/lh.js';
+import { createLhAdapter, parseLhNoticeListHtml } from '../src/adapters/lh.js';
 import { createShAdapter } from '../src/adapters/sh.js';
 import { ListingSchema, NoticeSchema } from '../src/types.js';
 
@@ -113,6 +113,63 @@ describe('adapter contract', () => {
         }
       }
     }
+  });
+
+  it('parses LH notice list HTML rows into raw notice candidates', () => {
+    const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <button
+                type="button"
+                class="wrtancInfoBtn"
+                data-id1="12345"
+                data-id2="A1"
+              >상세보기</button>
+            </td>
+            <td class="al">서울 청년 매입임대주택 모집</td>
+            <td>매입임대</td>
+            <td>서울특별시</td>
+            <td>2026-05-01</td>
+            <td>2026-05-15</td>
+            <td>접수중</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseLhNoticeListHtml(html)).toEqual([
+      {
+        sourceId: '12345',
+        title: '서울 청년 매입임대주택 모집',
+        status: '접수중',
+        region: '서울특별시',
+        postedAt: '2026-05-01',
+        applicationEndAt: '2026-05-15',
+        metadata: {
+          provider: 'LH',
+          rawIds: {
+            dataId1: '12345',
+            dataId2: 'A1',
+          },
+        },
+        listings: [
+          {
+            title: '서울 청년 매입임대주택 모집',
+            supplyType: '매입임대',
+            region: '서울특별시',
+            status: '접수중',
+            metadata: {
+              rawIds: {
+                dataId1: '12345',
+                dataId2: 'A1',
+              },
+            },
+          },
+        ],
+      },
+    ]);
   });
 });
 

@@ -1,5 +1,60 @@
 import type { RawNoticeCandidate, SourceAdapter } from './base.js';
 
+const LH_PROVIDER = 'LH';
+
+const extractCells = (rowHtml: string): string[] => {
+  const matches = Array.from(rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi));
+  return matches.map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim());
+};
+
+export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
+  const rows = Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
+  const notices: RawNoticeCandidate[] = [];
+
+  for (const [, rowHtml] of rows) {
+    const buttonMatch = rowHtml.match(/<[^>]*class=["'][^"']*wrtancInfoBtn[^"']*["'][^>]*data-id1=["']([^"']+)["'][^>]*data-id2=["']([^"']*)["'][^>]*>/i);
+    if (!buttonMatch) {
+      continue;
+    }
+
+    const [, dataId1, dataId2] = buttonMatch;
+    const cells = extractCells(rowHtml);
+    const title = cells[1] ?? '';
+    const supplyType = cells[2] ?? '';
+    const region = cells[3] ?? '';
+    const postedAt = cells[4] ?? '';
+    const applicationEndAt = cells[5] ?? '';
+    const status = cells[6] ?? '';
+    const rawIds = { dataId1, dataId2 };
+
+    notices.push({
+      sourceId: dataId1,
+      title,
+      status,
+      region,
+      postedAt,
+      applicationEndAt,
+      metadata: {
+        provider: LH_PROVIDER,
+        rawIds,
+      },
+      listings: [
+        {
+          title,
+          supplyType,
+          region,
+          status,
+          metadata: {
+            rawIds,
+          },
+        },
+      ],
+    });
+  }
+
+  return notices;
+};
+
 const LH_FIXTURE: RawNoticeCandidate[] = [
   {
     sourceId: 'lh-notice-1',
@@ -11,7 +66,7 @@ const LH_FIXTURE: RawNoticeCandidate[] = [
     applicationStartAt: '2026-05-10',
     applicationEndAt: '2026-05-20',
     sourceUrl: 'https://example.com/lh/notices/1',
-    metadata: { provider: 'LH', fixture: true },
+    metadata: { provider: LH_PROVIDER, fixture: true },
     listings: [
       {
         title: '101동 201호',
