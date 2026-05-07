@@ -1,8 +1,8 @@
-import type { SourceAdapter } from '../adapters/base';
-import { createRepository, type Repository } from '../db/repository';
-import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff';
-import { normalizeAdapterOutput } from '../domain/normalize';
-import type { NotificationEvent } from '../types';
+import type { SourceAdapter } from '../adapters/base.js';
+import { createRepository, type Repository } from '../db/repository.js';
+import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
+import { normalizeAdapterOutput } from '../domain/normalize.js';
+import type { NotificationEvent } from '../types.js';
 
 export type CollectFailure = {
   source: string;

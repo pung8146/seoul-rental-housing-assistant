@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildChangeHash, buildStableKey } from '../src/domain/keys';
-import type { Listing } from '../src/types';
+import { buildChangeHash, buildStableKey } from '../src/domain/keys.js';
+import type { Listing } from '../src/types.js';
 
 const makeListing = (overrides: Partial<Listing> = {}): Listing => ({
   source: 'lh',

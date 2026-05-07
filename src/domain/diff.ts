@@ -1,4 +1,4 @@
-import type { Listing, NotificationEvent, Notice } from '../types';
+import type { Listing, NotificationEvent, Notice } from '../types.js';
 
 export type DiffNoticeAndListingsInput = {
   incomingNotice: Notice;

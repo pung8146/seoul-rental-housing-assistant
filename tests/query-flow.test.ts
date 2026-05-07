@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { runQuery } from '../src/app/run-query';
-import { createRepository } from '../src/db/repository';
-import type { Listing, Notice } from '../src/types';
+import { runQuery } from '../src/app/run-query.js';
+import { createRepository } from '../src/db/repository.js';
+import type { Listing, Notice } from '../src/types.js';
 
 const makeNotice = (index: number, overrides: Partial<Notice> = {}): Notice => ({
   source: index % 2 === 0 ? 'sh' : 'lh',

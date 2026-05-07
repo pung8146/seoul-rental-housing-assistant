@@ -1,4 +1,4 @@
-import type { RawNoticeCandidate, SourceAdapter } from './base';
+import type { RawNoticeCandidate, SourceAdapter } from './base.js';
 
 const SH_FIXTURE: RawNoticeCandidate[] = [
   {

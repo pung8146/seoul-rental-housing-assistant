@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDailySummary, formatNoticeDetails } from '../src/notifier/formatter';
-import type { Listing, Notice, NotificationEvent } from '../src/types';
+import { formatDailySummary, formatNoticeDetails } from '../src/notifier/formatter.js';
+import type { Listing, Notice, NotificationEvent } from '../src/types.js';
 
 const makeNotice = (overrides: Partial<Notice> = {}): Notice => ({
   source: 'lh',

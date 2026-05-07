@@ -1,4 +1,4 @@
-import type { QueryFilters } from '../types';
+import type { QueryFilters } from '../types.js';
 
 type ListIntent = {
   intent: 'list';

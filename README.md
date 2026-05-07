@@ -1,44 +1,21 @@
 # Seoul Rental Housing Assistant
 
-A small Node.js + TypeScript project for collecting rental housing notices in Seoul/Gyeonggi, normalizing the data, storing it in SQLite, and preparing Telegram-friendly summaries.
+Collect Seoul/Gyeonggi rental housing notices, normalize/store them in SQLite, and render Telegram-friendly summaries for daily checks or on-demand queries.
 
-## Current Status
+## Smoke checklist
 
-This repository is in the bootstrap stage.
+- `npm install`
+- `npm run build`
+- `npm test`
+- `npm run collect`
+- `npm run query`
 
-Implemented so far:
-- TypeScript project setup
-- Vitest test runner setup
-- Basic smoke test
+## Runbook
 
-Planned next:
-- Domain types and normalization
-- SQLite schema and repository layer
-- Diff engine for new/changed listings
-- Query and collection flows
-- Telegram-friendly formatting
-
-## Tech Stack
-
-- Node.js
-- TypeScript
-- Vitest
-- better-sqlite3
-- zod
-- tsx
-
-## Getting Started
-
-### Install dependencies
+### Install
 
 ```bash
 npm install
-```
-
-### Run tests
-
-```bash
-npm test
 ```
 
 ### Build
@@ -47,75 +24,59 @@ npm test
 npm run build
 ```
 
-## Project Structure
+### Run tests
 
-```text
-.
-├── package.json
-├── tsconfig.json
-├── vitest.config.ts
-└── tests/
-    └── bootstrap.test.ts
+```bash
+npm test
 ```
 
-## Goal
+### Run collect
 
-The goal is to build an assistant that can:
-- collect rental housing notices from selected sources
-- normalize notice and listing data into a shared format
-- store snapshots in SQLite
-- detect new or changed listings
-- generate concise summaries suitable for Telegram delivery
+```bash
+npm run collect
+```
 
-## Notes
+By default this creates/uses `rental-housing.db`. Override with `RENTAL_HOUSING_DB_PATH=/path/to/file.db` if needed.
 
-- `node_modules/` is excluded from Git.
-- The repository currently contains only the initial bootstrap.
-- README updates should include a Korean translation when the main text is written in English.
+### Run query
+
+```bash
+npm run query
+```
+
+The current CLI entrypoint prints a default list query result from the local SQLite database.
+
+## Scripts
+
+- `npm run build` — TypeScript compile check
+- `npm test` — run Vitest once
+- `npm run collect` — execute collection flow
+- `npm run query` — execute query flow
+
+## Future integration note
+
+Next steps are wiring a scheduler/cron trigger for regular collection and connecting Telegram delivery/query handling on top of these app services.
 
 ---
 
 # 서울 임대주택 어시스턴트
 
-서울/경기 지역의 임대주택 공고를 수집하고, 데이터를 정규화하고, SQLite에 저장한 뒤, 텔레그램에 맞는 요약을 만들기 위한 작은 Node.js + TypeScript 프로젝트입니다.
+서울/경기 임대주택 공고를 수집하고, SQLite에 정규화 저장한 뒤, 텔레그램 친화적인 요약을 만드는 도구입니다.
 
-## 현재 상태
+## 스모크 체크리스트
 
-이 저장소는 현재 부트스트랩 단계입니다.
+- `npm install`
+- `npm run build`
+- `npm test`
+- `npm run collect`
+- `npm run query`
 
-지금까지 구현된 내용:
-- TypeScript 프로젝트 설정
-- Vitest 테스트 러너 설정
-- 기본 스모크 테스트
+## 실행 가이드
 
-다음으로 구현할 예정:
-- 도메인 타입 및 정규화
-- SQLite 스키마와 저장소 레이어
-- 신규/변경 매물 감지용 diff 엔진
-- 조회 및 수집 흐름
-- 텔레그램용 요약 포맷팅
-
-## 기술 스택
-
-- Node.js
-- TypeScript
-- Vitest
-- better-sqlite3
-- zod
-- tsx
-
-## 시작하기
-
-### 의존성 설치
+### 설치
 
 ```bash
 npm install
-```
-
-### 테스트 실행
-
-```bash
-npm test
 ```
 
 ### 빌드
@@ -124,28 +85,35 @@ npm test
 npm run build
 ```
 
-## 프로젝트 구조
+### 테스트 실행
 
-```text
-.
-├── package.json
-├── tsconfig.json
-├── vitest.config.ts
-└── tests/
-    └── bootstrap.test.ts
+```bash
+npm test
 ```
 
-## 목표
+### 수집 실행
 
-이 프로젝트의 목표는 다음을 할 수 있는 어시스턴트를 만드는 것입니다:
-- 선택한 소스에서 임대주택 공고 수집
-- 공고/매물 데이터를 공통 형식으로 정규화
-- SQLite에 스냅샷 저장
-- 신규 또는 변경된 매물 감지
-- 텔레그램에 보내기 좋은 간결한 요약 생성
+```bash
+npm run collect
+```
 
-## 참고
+기본적으로 `rental-housing.db`를 생성/사용합니다. 필요하면 `RENTAL_HOUSING_DB_PATH=/path/to/file.db`로 변경할 수 있습니다.
 
-- `node_modules/`는 Git에서 제외됩니다.
-- 현재 저장소에는 초기 부트스트랩만 들어 있습니다.
-- README를 영어로 쓸 때는 아래에 한국어 번역본도 함께 유지합니다.
+### 조회 실행
+
+```bash
+npm run query
+```
+
+현재 CLI 엔트리포인트는 로컬 SQLite 데이터베이스 기준 기본 목록 조회 결과를 출력합니다.
+
+## 스크립트
+
+- `npm run build` — TypeScript 컴파일 확인
+- `npm test` — Vitest 1회 실행
+- `npm run collect` — 수집 플로우 실행
+- `npm run query` — 조회 플로우 실행
+
+## 향후 연동 메모
+
+다음 단계는 정기 수집용 cron/스케줄러 연결과 텔레그램 발송/질의 처리 레이어를 이 앱 서비스 위에 붙이는 것입니다.

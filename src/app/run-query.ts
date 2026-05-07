@@ -1,7 +1,7 @@
-import { createRepository, type Repository } from '../db/repository';
-import type { ParsedCommand } from '../commands/parse';
-import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter';
-import type { Notice } from '../types';
+import { createRepository, type Repository } from '../db/repository.js';
+import type { ParsedCommand } from '../commands/parse.js';
+import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
+import type { Notice } from '../types.js';
 
 type RunQueryInput = {
   repository: Pick<Repository, 'queryNotices' | 'queryListingsByNotice'>;
@@ -65,7 +65,7 @@ export const runQuery = ({ repository, command }: RunQueryInput): RunQueryResult
   };
 };
 
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
 
   try {

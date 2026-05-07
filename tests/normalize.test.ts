@@ -5,10 +5,10 @@ import {
   normalizeRegion,
   parseNumber,
   parseTags,
-} from '../src/domain/normalize';
-import { createLhAdapter } from '../src/adapters/lh';
-import { createShAdapter } from '../src/adapters/sh';
-import { ListingSchema, NoticeSchema } from '../src/types';
+} from '../src/domain/normalize.js';
+import { createLhAdapter } from '../src/adapters/lh.js';
+import { createShAdapter } from '../src/adapters/sh.js';
+import { ListingSchema, NoticeSchema } from '../src/types.js';
 
 describe('core domain schemas', () => {
   it('accepts a normalized notice with required fields', () => {

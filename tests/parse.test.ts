@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseCommand } from '../src/commands/parse';
+import { parseCommand } from '../src/commands/parse.js';
 
 describe('parseCommand', () => {
   it('parses 오늘 공고 보여줘 as the default today list query', () => {

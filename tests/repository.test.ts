@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { createRepository } from '../src/db/repository';
-import { runCollect } from '../src/app/run-collect';
-import type { SourceAdapter } from '../src/adapters/base';
-import type { Listing, Notice } from '../src/types';
+import { createRepository } from '../src/db/repository.js';
+import { runCollect } from '../src/app/run-collect.js';
+import type { SourceAdapter } from '../src/adapters/base.js';
+import type { Listing, Notice } from '../src/types.js';
 
 const makeNotice = (overrides: Partial<Notice> = {}): Notice => ({
   source: 'lh',

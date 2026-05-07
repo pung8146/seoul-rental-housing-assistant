@@ -1,4 +1,4 @@
-import type { Listing, NotificationEvent, Notice } from '../types';
+import type { Listing, NotificationEvent, Notice } from '../types.js';
 
 export const formatNoticeSummaryLine = (notice: Notice, index: number): string => {
   const details = [notice.region, notice.status].filter((value): value is string => Boolean(value)).join(' · ');

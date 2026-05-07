@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 
-import { schemaSql } from './schema';
+import { schemaSql } from './schema.js';
 
 export type SqliteDatabase = Database.Database;
 

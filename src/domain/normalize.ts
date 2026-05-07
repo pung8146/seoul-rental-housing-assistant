@@ -1,5 +1,5 @@
-import { buildChangeHash, buildNoticeChangeHash, buildNoticeStableKey, buildStableKey } from './keys';
-import type { Listing, Notice } from '../types';
+import { buildChangeHash, buildNoticeChangeHash, buildNoticeStableKey, buildStableKey } from './keys.js';
+import type { Listing, Notice } from '../types.js';
 
 type RawListing = {
   title?: unknown;

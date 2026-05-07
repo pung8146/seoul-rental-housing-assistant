@@ -1,5 +1,5 @@
-import { createDatabase, type SqliteDatabase } from './client';
-import type { Listing, Notice, QueryFilters, SourceRun } from '../types';
+import { createDatabase, type SqliteDatabase } from './client.js';
+import type { Listing, Notice, QueryFilters, SourceRun } from '../types.js';
 
 type NoticeRow = {
   source: string;

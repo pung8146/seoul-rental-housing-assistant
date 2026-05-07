@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { diffNoticeAndListings } from '../src/domain/diff';
-import type { Listing, Notice } from '../src/types';
+import { diffNoticeAndListings } from '../src/domain/diff.js';
+import type { Listing, Notice } from '../src/types.js';
 
 const makeNotice = (overrides: Partial<Notice> = {}): Notice => ({
   source: 'lh',
