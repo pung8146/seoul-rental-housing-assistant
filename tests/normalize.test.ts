@@ -134,6 +134,36 @@ describe('normalization helpers', () => {
     expect(listing.changeHash).toBeTruthy();
   });
 
+  it('keeps notice stableKey for identity while changeHash tracks meaningful notice content changes', () => {
+    const makeNotice = (overrides: Record<string, unknown> = {}) =>
+      normalizeAdapterOutput({
+        source: 'lh',
+        notices: [
+          {
+            sourceId: 'notice-2',
+            title: '경기도 매입임대',
+            status: 'open',
+            region: '경기도',
+            targetTags: ['청년'],
+            postedAt: '2026-05-07',
+            applicationStartAt: '2026-05-08',
+            applicationEndAt: '2026-05-20',
+            sourceUrl: 'https://example.com/notices/2',
+            ...overrides,
+          },
+        ],
+      }).notices[0];
+
+    const baseNotice = NoticeSchema.parse(makeNotice());
+    const sameIdentityChangedContent = NoticeSchema.parse(makeNotice({ status: 'closed' }));
+    const sameContent = NoticeSchema.parse(makeNotice());
+
+    expect(baseNotice.stableKey).toBe('notice:lh:notice-2');
+    expect(sameIdentityChangedContent.stableKey).toBe(baseNotice.stableKey);
+    expect(sameContent.changeHash).toBe(baseNotice.changeHash);
+    expect(sameIdentityChangedContent.changeHash).not.toBe(baseNotice.changeHash);
+  });
+
   it('converts missing optional values to null instead of undefined', () => {
     const result = normalizeAdapterOutput({
       source: 'sh',

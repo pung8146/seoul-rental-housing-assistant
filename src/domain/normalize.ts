@@ -1,4 +1,4 @@
-import { buildChangeHash, buildStableKey } from './keys';
+import { buildChangeHash, buildNoticeChangeHash, buildNoticeStableKey, buildStableKey } from './keys';
 import type { Listing, Notice } from '../types';
 
 type RawListing = {
@@ -103,8 +103,8 @@ export const normalizeAdapterOutput = ({ source, notices }: RawAdapterOutput): {
       source,
       sourceId,
       title,
-      stableKey: `notice:${source}:${sourceId}`,
-      changeHash: `notice:${source}:${sourceId}`,
+      stableKey: '',
+      changeHash: '',
       status: nullableText(rawNotice.status),
       region: normalizeRegion(rawNotice.region),
       targetTags: parseTags(rawNotice.targetTags),
@@ -114,6 +114,9 @@ export const normalizeAdapterOutput = ({ source, notices }: RawAdapterOutput): {
       sourceUrl: nullableText(rawNotice.sourceUrl),
       metadata: rawNotice.metadata ?? {},
     };
+
+    notice.stableKey = buildNoticeStableKey(notice);
+    notice.changeHash = buildNoticeChangeHash(notice);
 
     normalizedNotices.push(notice);
 

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { Listing } from '../types';
+import type { Listing, Notice } from '../types';
 
 const normalizeText = (value: unknown): string => {
   if (typeof value !== 'string') {
@@ -42,4 +42,20 @@ export const buildChangeHash = (listing: Listing): string =>
     normalizeText(listing.region),
     normalizeText(listing.supplyType),
     normalizeText(listing.targetTags.join('|')),
+  ]);
+
+export const buildNoticeStableKey = (notice: Notice): string =>
+  `notice:${notice.source}:${notice.sourceId}`;
+
+export const buildNoticeChangeHash = (notice: Notice): string =>
+  hashParts([
+    buildNoticeStableKey(notice),
+    normalizeText(notice.title),
+    normalizeText(notice.status),
+    normalizeText(notice.region),
+    normalizeText(notice.postedAt),
+    normalizeText(notice.applicationStartAt),
+    normalizeText(notice.applicationEndAt),
+    normalizeText(notice.sourceUrl),
+    normalizeText(notice.targetTags.join('|')),
   ]);
