@@ -1,0 +1,102 @@
+import { describe, expect, it } from 'vitest';
+
+import { createRepository } from '../src/db/repository';
+import type { Listing, Notice } from '../src/types';
+
+const makeNotice = (overrides: Partial<Notice> = {}): Notice => ({
+  source: 'lh',
+  sourceId: 'notice-1',
+  title: '서울 청년 임대주택 모집',
+  stableKey: 'notice:lh:notice-1',
+  changeHash: 'notice-hash-1',
+  status: 'open',
+  region: '서울',
+  targetTags: ['청년'],
+  postedAt: '2026-05-07',
+  applicationStartAt: null,
+  applicationEndAt: null,
+  sourceUrl: 'https://example.com/notices/1',
+  metadata: { round: 1 },
+  ...overrides,
+});
+
+const makeListing = (overrides: Partial<Listing> = {}): Listing => ({
+  source: 'lh',
+  noticeSourceId: 'notice-1',
+  title: '행복주택 101동 201호',
+  stableKey: 'listing:lh:notice-1:101-201',
+  changeHash: 'listing-hash-1',
+  supplyType: '행복주택',
+  region: '서울',
+  targetTags: ['청년'],
+  deposit: 10000000,
+  monthlyRent: 250000,
+  floorAreaM2: 39.8,
+  status: 'available',
+  metadata: { building: '101동', unit: '201호' },
+  ...overrides,
+});
+
+describe('sqlite repository', () => {
+  it('initializes schema successfully', () => {
+    const repository = createRepository(':memory:');
+
+    expect(repository.queryNotices({})).toEqual([]);
+  });
+
+  it('inserts and fetches notices and listings', () => {
+    const repository = createRepository(':memory:');
+    const notice = makeNotice();
+    const listing = makeListing();
+
+    repository.upsertNotice(notice);
+    repository.upsertListing(listing);
+    repository.insertListingSnapshot(listing);
+
+    expect(repository.findNoticeBySourceId('lh', 'notice-1')).toMatchObject({
+      title: notice.title,
+      stableKey: notice.stableKey,
+      metadata: notice.metadata,
+    });
+    expect(repository.findListingByStableKey(listing.stableKey)).toMatchObject({
+      title: listing.title,
+      changeHash: listing.changeHash,
+      metadata: listing.metadata,
+    });
+    expect(repository.queryNotices({ source: 'lh' })).toHaveLength(1);
+    expect(repository.queryListingsByNotice('lh', 'notice-1')).toMatchObject([
+      expect.objectContaining({ stableKey: listing.stableKey }),
+    ]);
+  });
+
+  it('suppresses duplicate notification payload hashes', () => {
+    const repository = createRepository(':memory:');
+
+    expect(repository.hasNotification('daily-summary', 'payload-hash-1')).toBe(false);
+
+    repository.recordNotification('daily-summary', 'payload-hash-1', '2026-05-07T09:00:00.000Z');
+
+    expect(repository.hasNotification('daily-summary', 'payload-hash-1')).toBe(true);
+    expect(repository.hasNotification('daily-summary', 'payload-hash-2')).toBe(false);
+  });
+
+  it('records source runs including failure messages', () => {
+    const repository = createRepository(':memory:');
+
+    repository.recordSourceRun({
+      source: 'lh',
+      startedAt: '2026-05-07T09:00:00.000Z',
+      finishedAt: '2026-05-07T09:05:00.000Z',
+      status: 'failure',
+      message: 'network timeout',
+    });
+
+    expect(repository.listSourceRuns()).toMatchObject([
+      {
+        source: 'lh',
+        status: 'failure',
+        message: 'network timeout',
+      },
+    ]);
+  });
+});
