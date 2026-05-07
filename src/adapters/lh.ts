@@ -14,6 +14,10 @@ const extractCells = (rowHtml: string): string[] => {
   return matches.map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim());
 };
 
+const isDateCell = (value: string): boolean => /^\d{4}[-.]\d{2}[-.]\d{2}$/.test(value);
+
+const normalizeLhDate = (value: string): string => value.replace(/\./g, '-');
+
 export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
   const rows = Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
   const notices: RawNoticeCandidate[] = [];
@@ -26,12 +30,13 @@ export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
 
     const [, dataId1, dataId2] = buttonMatch;
     const cells = extractCells(rowHtml);
-    const title = cells[1] ?? '';
-    const supplyType = cells[2] ?? '';
-    const region = cells[3] ?? '';
-    const postedAt = cells[4] ?? '';
-    const applicationEndAt = cells[5] ?? '';
-    const status = cells[6] ?? '';
+    const titleCellIndex = cells.findIndex((cell, index) => index > 0 && !isDateCell(cell) && isDateCell(cells[index + 3] ?? ''));
+    const title = cells[titleCellIndex] ?? '';
+    const supplyType = cells[titleCellIndex + 1] ?? '';
+    const region = cells[titleCellIndex + 2] ?? '';
+    const postedAt = normalizeLhDate(cells[titleCellIndex + 3] ?? '');
+    const applicationEndAt = normalizeLhDate(cells[titleCellIndex + 4] ?? '');
+    const status = cells[titleCellIndex + 5] ?? '';
     const rawIds = { dataId1, dataId2 };
 
     notices.push({
