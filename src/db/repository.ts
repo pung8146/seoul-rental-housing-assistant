@@ -231,7 +231,7 @@ export const createRepository = (filename: string, database = createDatabase(fil
           payload: JSON.parse((row as ListingSnapshotRow).payload_json) as Listing,
         }));
     },
-    queryNotices(filters: QueryFilters) {
+    queryNotices(filters: QueryFilters, options: { limit?: number } = {}) {
       const clauses: string[] = [];
       const values: unknown[] = [];
 
@@ -257,8 +257,9 @@ export const createRepository = (filename: string, database = createDatabase(fil
       }
 
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+      const limitClause = typeof options.limit === 'number' ? ` LIMIT ${options.limit}` : '';
       const rows = database
-        .prepare(`SELECT * FROM notices ${where} ORDER BY posted_at DESC, id DESC`)
+        .prepare(`SELECT * FROM notices ${where} ORDER BY posted_at DESC, id DESC${limitClause}`)
         .all(...values) as NoticeRow[];
 
       return rows.map(mapNoticeRow).filter((notice) => {

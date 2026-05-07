@@ -1,5 +1,10 @@
 import type { Listing, NotificationEvent, Notice } from '../types';
 
+export const formatNoticeSummaryLine = (notice: Notice, index: number): string => {
+  const details = [notice.region, notice.status].filter((value): value is string => Boolean(value)).join(' · ');
+  return `${index}. ${notice.title}${details ? ` (${details})` : ''}`;
+};
+
 type Failure = {
   source: string;
   message: string | null;
