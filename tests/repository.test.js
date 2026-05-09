@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createLhAdapter } from '../src/adapters/lh.js';
 import { createRepository } from '../src/db/repository.js';
 import { runCollect } from '../src/app/run-collect.js';
 const makeNotice = (overrides = {}) => ({
@@ -185,5 +186,64 @@ describe('sqlite repository', () => {
             listingStableKey: secondRun.events[0]?.listing?.stableKey,
             changeHash: secondRun.events[0]?.listing?.changeHash,
         });
+    });
+    it('collects live LH adapter notices without missing downstream-required fields', async () => {
+        const repository = createRepository(':memory:');
+        const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>
+              <button class="wrtancInfoBtn" data-id1="202605070001" data-id2="01">상반기 청년 매입임대주택 모집</button>
+            </td>
+            <td>매입임대</td>
+            <td>서울특별시</td>
+            <td>2026.05.07</td>
+            <td>2026.05.20</td>
+            <td>접수중</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+        const adapter = createLhAdapter({
+            fetch: async () => new Response(html, {
+                status: 200,
+                headers: { 'Content-Type': 'text/html; charset=utf-8' },
+            }),
+        });
+        const result = await runCollect({ adapters: [adapter], repository });
+        expect(result.failures).toEqual([]);
+        expect(result.events).toHaveLength(1);
+        expect(result.events[0]).toMatchObject({
+            type: 'new_notice',
+            notice: expect.objectContaining({
+                source: 'lh',
+                sourceId: '202605070001',
+                title: '상반기 청년 매입임대주택 모집',
+                region: '서울',
+                postedAt: '2026-05-07',
+                applicationEndAt: '2026-05-20',
+                metadata: expect.objectContaining({
+                    provider: 'LH',
+                    rawIds: { dataId1: '202605070001', dataId2: '01' },
+                }),
+            }),
+            listing: null,
+        });
+        expect(repository.findNoticeBySourceId('lh', '202605070001')).toMatchObject({
+            title: '상반기 청년 매입임대주택 모집',
+            region: '서울',
+            postedAt: '2026-05-07',
+            applicationEndAt: '2026-05-20',
+        });
+        expect(repository.queryListingsByNotice('lh', '202605070001')).toMatchObject([
+            expect.objectContaining({
+                title: '상반기 청년 매입임대주택 모집',
+                supplyType: '매입임대',
+                region: '서울',
+                status: '접수중',
+            }),
+        ]);
     });
 });

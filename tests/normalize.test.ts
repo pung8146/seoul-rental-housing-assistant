@@ -7,7 +7,7 @@ import {
   parseTags,
 } from '../src/domain/normalize.js';
 import { createLhAdapter, parseLhNoticeListHtml, type CreateLhAdapterOptions } from '../src/adapters/lh.js';
-import { createShAdapter } from '../src/adapters/sh.js';
+import { createShAdapter, parseShNoticeListHtml, type CreateShAdapterOptions } from '../src/adapters/sh.js';
 import { ListingSchema, NoticeSchema } from '../src/types.js';
 
 describe('core domain schemas', () => {
@@ -240,6 +240,127 @@ describe('adapter contract', () => {
               rawIds: {
                 dataId1: '67890',
                 dataId2: 'B2',
+              },
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('parses SH notice list HTML rows into raw notice candidates', () => {
+    const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>1607</td>
+            <td class="txtL">
+              <a href="#" class="ellipsis" onclick="javascript:getDetailView('304116');return false;">
+                2026 SH rental housing notice
+              </a>
+            </td>
+            <td>Rental Supply Team</td>
+            <td class="num">2026-05-08</td>
+            <td class="num">4031</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseShNoticeListHtml(html)).toEqual([
+      {
+        sourceId: '304116',
+        title: '2026 SH rental housing notice',
+        status: 'posted',
+        region: '서울',
+        postedAt: '2026-05-08',
+        sourceUrl: 'https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?multi_itm_seq=2&seq=304116',
+        metadata: {
+          provider: 'SH',
+          department: 'Rental Supply Team',
+          rawIds: {
+            seq: '304116',
+          },
+        },
+        listings: [
+          {
+            title: '2026 SH rental housing notice',
+            supplyType: 'Rental Supply Team',
+            region: '서울',
+            status: 'posted',
+            metadata: {
+              rawIds: {
+                seq: '304116',
+              },
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('fetches live SH notice HTML with an injected fetch implementation', async () => {
+    const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>1608</td>
+            <td class="txtL">
+              <a href="#" class="ellipsis" onclick="javascript:getDetailView('304117');return false;">
+                2026 SH youth rental notice
+              </a>
+            </td>
+            <td>Youth Housing Team</td>
+            <td class="num">2026-05-09</td>
+            <td class="num">100</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    const fetchCalls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const fetchImpl: NonNullable<CreateShAdapterOptions['fetch']> = async (input, init) => {
+      fetchCalls.push({ input, init });
+      return new Response(html, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    };
+
+    const adapter = createShAdapter({ fetch: fetchImpl });
+    expect(adapter.source).toBe('sh');
+
+    const notices = await adapter.fetchNotices();
+    expect(fetchCalls).toEqual([
+      {
+        input: 'https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/list.do?multi_itm_seq=2',
+        init: undefined,
+      },
+    ]);
+
+    expect(notices).toEqual([
+      {
+        sourceId: '304117',
+        title: '2026 SH youth rental notice',
+        status: 'posted',
+        region: '서울',
+        postedAt: '2026-05-09',
+        sourceUrl: 'https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?multi_itm_seq=2&seq=304117',
+        metadata: {
+          provider: 'SH',
+          department: 'Youth Housing Team',
+          rawIds: {
+            seq: '304117',
+          },
+        },
+        listings: [
+          {
+            title: '2026 SH youth rental notice',
+            supplyType: 'Youth Housing Team',
+            region: '서울',
+            status: 'posted',
+            metadata: {
+              rawIds: {
+                seq: '304117',
               },
             },
           },

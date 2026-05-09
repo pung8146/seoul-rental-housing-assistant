@@ -14,30 +14,55 @@ const extractCells = (rowHtml: string): string[] => {
   return matches.map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim());
 };
 
+const extractAttribute = (html: string, name: string): string | null => {
+  const match = html.match(new RegExp(`${name}=["']([^"']*)["']`, 'i'));
+  return match?.[1] ?? null;
+};
+
+const extractAnchorText = (rowHtml: string): string => {
+  const anchorMatch = rowHtml.match(/<([a-z]+)\b[^>]*class=["'][^"']*wrtancInfoBtn[^"']*["'][^>]*>([\s\S]*?)<\/\1>/i);
+  return anchorMatch?.[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
+};
+
 const isDateCell = (value: string): boolean => /^\d{4}[-.]\d{2}[-.]\d{2}$/.test(value);
 
 const normalizeLhDate = (value: string): string => value.replace(/\./g, '-');
+
+const compactRawIds = (ids: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(Object.entries(ids).filter(([, value]) => value.length > 0));
 
 export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
   const rows = Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
   const notices: RawNoticeCandidate[] = [];
 
   for (const [, rowHtml] of rows) {
-    const buttonMatch = rowHtml.match(/<[^>]*class=["'][^"']*wrtancInfoBtn[^"']*["'][^>]*data-id1=["']([^"']+)["'][^>]*data-id2=["']([^"']*)["'][^>]*>/i);
+    const buttonMatch = rowHtml.match(/<[^>]*class=["'][^"']*wrtancInfoBtn[^"']*["'][^>]*>/i);
     if (!buttonMatch) {
       continue;
     }
 
-    const [, dataId1, dataId2] = buttonMatch;
+    const dataId1 = extractAttribute(buttonMatch[0], 'data-id1');
+    if (!dataId1) {
+      continue;
+    }
+
+    const dataId2 = extractAttribute(buttonMatch[0], 'data-id2') ?? '';
+    const dataId3 = extractAttribute(buttonMatch[0], 'data-id3') ?? '';
+    const dataId4 = extractAttribute(buttonMatch[0], 'data-id4') ?? '';
     const cells = extractCells(rowHtml);
-    const titleCellIndex = cells.findIndex((cell, index) => index > 0 && !isDateCell(cell) && isDateCell(cells[index + 3] ?? ''));
-    const title = cells[titleCellIndex] ?? '';
-    const supplyType = cells[titleCellIndex + 1] ?? '';
-    const region = cells[titleCellIndex + 2] ?? '';
-    const postedAt = normalizeLhDate(cells[titleCellIndex + 3] ?? '');
-    const applicationEndAt = normalizeLhDate(cells[titleCellIndex + 4] ?? '');
-    const status = cells[titleCellIndex + 5] ?? '';
-    const rawIds = { dataId1, dataId2 };
+    let title = extractAnchorText(rowHtml);
+    let titleCellIndex = cells.findIndex((cell) => title.length > 0 && cell.includes(title));
+    if (titleCellIndex === 0 || titleCellIndex < 0) {
+      titleCellIndex = cells.findIndex((cell, index) => index > 0 && !isDateCell(cell) && isDateCell(cells[index + 3] ?? ''));
+      title = cells[titleCellIndex] ?? title;
+    }
+    const postedAtIndex = cells.findIndex((cell, index) => index > titleCellIndex && isDateCell(cell));
+    const supplyType = titleCellIndex > 1 ? cells[titleCellIndex - 1] : cells[titleCellIndex + 1] ?? '';
+    const region = postedAtIndex > titleCellIndex ? cells.slice(titleCellIndex + 1, postedAtIndex).filter(Boolean).at(-1) ?? '' : '';
+    const postedAt = normalizeLhDate(cells[postedAtIndex] ?? '');
+    const applicationEndAt = normalizeLhDate(cells.find((cell, index) => index > postedAtIndex && isDateCell(cell)) ?? '');
+    const status = cells[postedAtIndex + 2] ?? cells[postedAtIndex + 1] ?? '';
+    const rawIds = compactRawIds({ dataId1, dataId2, dataId3, dataId4 });
 
     notices.push({
       sourceId: dataId1,
