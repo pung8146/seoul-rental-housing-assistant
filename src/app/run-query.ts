@@ -1,4 +1,5 @@
 import { createRepository, type Repository } from '../db/repository.js';
+import { parseCommand } from '../commands/parse.js';
 import type { ParsedCommand } from '../commands/parse.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 import type { Notice } from '../types.js';
@@ -12,6 +13,11 @@ type RunQueryResult = {
   text: string;
   lines: string[];
   notices: Notice[];
+};
+
+type RunQueryTextInput = {
+  repository: Pick<Repository, 'queryNotices' | 'queryListingsByNotice'>;
+  input: string;
 };
 
 const MAX_SUMMARY_COUNT = 5;
@@ -65,16 +71,17 @@ export const runQuery = ({ repository, command }: RunQueryInput): RunQueryResult
   };
 };
 
+export const runQueryText = ({ repository, input }: RunQueryTextInput): RunQueryResult =>
+  runQuery({ repository, command: parseCommand(input) });
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
 
   try {
-    const result = runQuery({
+    const input = process.argv.slice(2).join(' ') || '공고 조회';
+    const result = runQueryText({
       repository,
-      command: {
-        intent: 'list',
-        filters: {},
-      },
+      input,
     });
     console.log(result.text);
   } finally {
@@ -82,4 +89,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
 }
 
-export type { RunQueryInput, RunQueryResult };
+export type { RunQueryInput, RunQueryResult, RunQueryTextInput };

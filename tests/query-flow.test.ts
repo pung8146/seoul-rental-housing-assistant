@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { runQuery } from '../src/app/run-query.js';
+import { runQuery, runQueryText } from '../src/app/run-query.js';
 import { createRepository } from '../src/db/repository.js';
 import type { Listing, Notice } from '../src/types.js';
 
@@ -99,6 +99,22 @@ describe('runQuery', () => {
         intent: 'linkOnly',
         index: 2,
       },
+    });
+
+    expect(result.text).toBe('https://example.com/notices/1');
+  });
+
+  it('parses user text before running query flow', () => {
+    const repository = createRepository(':memory:');
+    const notices = [makeNotice(1), makeNotice(2)];
+
+    notices.forEach((notice) => {
+      repository.upsertNotice(notice);
+    });
+
+    const result = runQueryText({
+      repository,
+      input: '2번 링크만',
     });
 
     expect(result.text).toBe('https://example.com/notices/1');

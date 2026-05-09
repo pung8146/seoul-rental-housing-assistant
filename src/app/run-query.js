@@ -1,4 +1,5 @@
 import { createRepository } from '../db/repository.js';
+import { parseCommand } from '../commands/parse.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 const MAX_SUMMARY_COUNT = 5;
 const selectNotices = (repository, index) => {
@@ -41,15 +42,14 @@ export const runQuery = ({ repository, command }) => {
         notices,
     };
 };
+export const runQueryText = ({ repository, input }) => runQuery({ repository, command: parseCommand(input) });
 if (import.meta.url === `file://${process.argv[1]}`) {
     const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
     try {
-        const result = runQuery({
+        const input = process.argv.slice(2).join(' ') || '공고 조회';
+        const result = runQueryText({
             repository,
-            command: {
-                intent: 'list',
-                filters: {},
-            },
+            input,
         });
         console.log(result.text);
     }
