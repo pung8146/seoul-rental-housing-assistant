@@ -2,6 +2,7 @@ import type { RawNoticeCandidate, SourceAdapter } from './base.js';
 
 const LH_PROVIDER = 'LH';
 const LH_NOTICE_LIST_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?mi=1026';
+const LH_NOTICE_DETAIL_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do';
 
 type LhFetch = typeof fetch;
 
@@ -30,6 +31,29 @@ const normalizeLhDate = (value: string): string => value.replace(/\./g, '-');
 
 const compactRawIds = (ids: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(ids).filter(([, value]) => value.length > 0));
+
+const buildLhNoticeDetailUrl = (rawIds: Record<string, string>): string | undefined => {
+  const panId = rawIds.dataId1;
+  const ccrCnntSysDsCd = rawIds.dataId2;
+  const uppAisTpCd = rawIds.dataId3;
+  const aisTpCd = rawIds.dataId4;
+
+  if (!panId || !ccrCnntSysDsCd || !uppAisTpCd || !aisTpCd) {
+    return undefined;
+  }
+
+  const params = new URLSearchParams({
+    ccrCnntSysDsCd,
+    panId,
+    aisTpCd,
+    uppAisTpCd,
+    mi: '1026',
+    panKdCd: '',
+    otxtPanId: '',
+  });
+
+  return `${LH_NOTICE_DETAIL_URL}?${params.toString()}`;
+};
 
 export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
   const rows = Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
@@ -73,6 +97,7 @@ export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
       region,
       postedAt,
       applicationEndAt,
+      sourceUrl: buildLhNoticeDetailUrl(rawIds),
       metadata: {
         provider: LH_PROVIDER,
         rawIds,

@@ -280,6 +280,7 @@ describe('adapter contract', () => {
                 region: '전북',
                 postedAt: '2026-05-08',
                 applicationEndAt: '2026-05-21',
+                sourceUrl: 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?ccrCnntSysDsCd=03&panId=2015122300019915&aisTpCd=07&uppAisTpCd=06&mi=1026&panKdCd=&otxtPanId=',
                 metadata: {
                     provider: 'LH',
                     rawIds: {
