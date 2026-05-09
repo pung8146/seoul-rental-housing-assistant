@@ -4,7 +4,7 @@ import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
 import { createRepository, type Repository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
-import { normalizeAdapterOutput } from '../domain/normalize.js';
+import { normalizeAdapterOutput, normalizeRegion } from '../domain/normalize.js';
 import { formatDailySummary } from '../notifier/formatter.js';
 import type { NotificationEvent } from '../types.js';
 
@@ -16,6 +16,7 @@ export type CollectFailure = {
 export type RunCollectInput = {
   adapters: SourceAdapter[];
   repository: Repository;
+  regions?: string[];
 };
 
 export type RunCollectResult = {
@@ -32,11 +33,18 @@ const toMessage = (error: unknown): string => {
 };
 
 const DETAIL_FETCH_CONCURRENCY = 5;
+const DEFAULT_COLLECT_REGIONS = ['서울', '경기'];
 
 export const createDefaultAdapters = (): SourceAdapter[] => [createLhAdapter(), createShAdapter()];
 
 export const formatCollectResult = (result: RunCollectResult): string =>
   formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
+
+const filterNoticesByRegion = (rawNotices: RawNoticeCandidate[], regions: string[]): RawNoticeCandidate[] =>
+  rawNotices.filter((notice) => {
+    const region = normalizeRegion(notice.region);
+    return region ? regions.includes(region) : true;
+  });
 
 const hydrateNoticeDetails = async (
   adapter: SourceAdapter,
@@ -61,7 +69,11 @@ const hydrateNoticeDetails = async (
   return hydrated;
 };
 
-export const runCollect = async ({ adapters, repository }: RunCollectInput): Promise<RunCollectResult> => {
+export const runCollect = async ({
+  adapters,
+  repository,
+  regions = DEFAULT_COLLECT_REGIONS,
+}: RunCollectInput): Promise<RunCollectResult> => {
   const events: NotificationEvent[] = [];
   const failures: CollectFailure[] = [];
 
@@ -70,7 +82,8 @@ export const runCollect = async ({ adapters, repository }: RunCollectInput): Pro
 
     try {
       const rawNotices = await adapter.fetchNotices();
-      const detailedNotices = await hydrateNoticeDetails(adapter, rawNotices);
+      const scopedNotices = filterNoticesByRegion(rawNotices, regions);
+      const detailedNotices = await hydrateNoticeDetails(adapter, scopedNotices);
       const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
 
       for (const notice of notices) {

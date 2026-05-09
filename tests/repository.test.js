@@ -268,6 +268,39 @@ describe('sqlite repository', () => {
             }),
         ]);
     });
+    it('collects Seoul and Gyeonggi notices by default', async () => {
+        const repository = createRepository(':memory:');
+        const adapter = {
+            source: 'lh',
+            async fetchNotices() {
+                return [
+                    {
+                        sourceId: 'seoul-notice',
+                        title: '서울 공고',
+                        region: '서울특별시',
+                        listings: [{ title: '서울 매물', region: '서울특별시' }],
+                    },
+                    {
+                        sourceId: 'gyeonggi-notice',
+                        title: '경기 공고',
+                        region: '경기도',
+                        listings: [{ title: '경기 매물', region: '경기도' }],
+                    },
+                    {
+                        sourceId: 'jeonbuk-notice',
+                        title: '전북 공고',
+                        region: '전북',
+                        listings: [{ title: '전북 매물', region: '전북' }],
+                    },
+                ];
+            },
+        };
+        await runCollect({ repository, adapters: [adapter] });
+        expect(repository.queryNotices({}).map((notice) => notice.sourceId)).toEqual([
+            'gyeonggi-notice',
+            'seoul-notice',
+        ]);
+    });
     it('fetches notice details with limited parallelism', async () => {
         const repository = createRepository(':memory:');
         let active = 0;

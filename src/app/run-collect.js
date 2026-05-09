@@ -2,7 +2,7 @@ import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
 import { createRepository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
-import { normalizeAdapterOutput } from '../domain/normalize.js';
+import { normalizeAdapterOutput, normalizeRegion } from '../domain/normalize.js';
 import { formatDailySummary } from '../notifier/formatter.js';
 const toMessage = (error) => {
     if (error instanceof Error) {
@@ -11,8 +11,13 @@ const toMessage = (error) => {
     return 'unknown error';
 };
 const DETAIL_FETCH_CONCURRENCY = 5;
+const DEFAULT_COLLECT_REGIONS = ['서울', '경기'];
 export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
 export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
+const filterNoticesByRegion = (rawNotices, regions) => rawNotices.filter((notice) => {
+    const region = normalizeRegion(notice.region);
+    return region ? regions.includes(region) : true;
+});
 const hydrateNoticeDetails = async (adapter, rawNotices) => {
     if (!adapter.fetchNoticeDetails) {
         return rawNotices;
@@ -28,14 +33,15 @@ const hydrateNoticeDetails = async (adapter, rawNotices) => {
     }
     return hydrated;
 };
-export const runCollect = async ({ adapters, repository }) => {
+export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLECT_REGIONS, }) => {
     const events = [];
     const failures = [];
     for (const adapter of adapters) {
         const startedAt = new Date().toISOString();
         try {
             const rawNotices = await adapter.fetchNotices();
-            const detailedNotices = await hydrateNoticeDetails(adapter, rawNotices);
+            const scopedNotices = filterNoticesByRegion(rawNotices, regions);
+            const detailedNotices = await hydrateNoticeDetails(adapter, scopedNotices);
             const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
             for (const notice of notices) {
                 const incomingListings = listings.filter((listing) => listing.source === notice.source && listing.noticeSourceId === notice.sourceId);
