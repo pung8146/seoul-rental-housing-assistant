@@ -12,8 +12,19 @@ export type CreateShAdapterOptions = {
 
 const extractCells = (rowHtml: string): string[] => {
   const matches = Array.from(rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi));
-  return matches.map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim());
+  return matches.map((match) => stripHtml(match[1]));
 };
+
+const stripHtml = (html: string): string =>
+  html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const decodeHtmlEntities = (value: string): string => value.replace(/&amp;/gi, '&');
 
 const extractTitle = (rowHtml: string): string => {
   const anchorMatch = rowHtml.match(/<a\b[^>]*onclick=["'][^"']*getDetailView\(['"][^'"]+['"]\)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
@@ -67,6 +78,57 @@ export const parseShNoticeListHtml = (html: string): RawNoticeCandidate[] => {
   return notices;
 };
 
+const toAbsoluteShUrl = (value: string): string =>
+  decodeHtmlEntities(value).startsWith('http')
+    ? decodeHtmlEntities(value)
+    : new URL(decodeHtmlEntities(value), 'https://www.i-sh.co.kr').toString();
+
+const isFileLabel = (value: string): boolean =>
+  value.length > 0 && !value.startsWith('.') && /\.(pdf|hwp|hwpx|xls|xlsx|doc|docx|zip)$/i.test(value);
+
+const extractAttachments = (html: string): Array<{ title: string; url: string }> => {
+  const anchors = Array.from(html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)).map(
+    ([, href, label]) => ({
+      title: stripHtml(label),
+      url: toAbsoluteShUrl(href),
+    }),
+  );
+  const attachments: Array<{ title: string; url: string }> = [];
+
+  for (let index = 0; index < anchors.length; index += 1) {
+    const anchor = anchors[index];
+    if (!anchor || !isFileLabel(anchor.title)) {
+      continue;
+    }
+
+    const nextPreview = anchors.slice(index + 1).find((candidate) => candidate.title === '미리보기');
+    attachments.push({
+      title: anchor.title,
+      url: anchor.url === 'https://www.i-sh.co.kr/#' && nextPreview ? nextPreview.url : anchor.url,
+    });
+  }
+
+  return attachments;
+};
+
+export const parseShNoticeDetailHtml = (html: string, notice: RawNoticeCandidate): RawNoticeCandidate => {
+  const attachments = extractAttachments(html);
+  const bodyPreview = stripHtml(
+    html
+      .replace(/<a\b[^>]*href=["']#["'][^>]*>\s*\.[a-z0-9]+\s*<\/a>/gi, ' ')
+      .replace(/<a\b[^>]*>\s*미리보기\s*<\/a>/gi, ' '),
+  ).slice(0, 300);
+
+  return {
+    ...notice,
+    metadata: {
+      ...(notice.metadata ?? {}),
+      attachments,
+      bodyPreview,
+    },
+  };
+};
+
 const SH_FIXTURE: RawNoticeCandidate[] = [
   {
     sourceId: 'sh-notice-1',
@@ -97,6 +159,7 @@ const SH_FIXTURE: RawNoticeCandidate[] = [
 
 export const createShAdapter = (options: CreateShAdapterOptions = {}): SourceAdapter => {
   const fetchImpl = options.fetch ?? fetch;
+  const noticesById = new Map<string, RawNoticeCandidate>();
 
   return {
     source: 'sh',
@@ -104,11 +167,20 @@ export const createShAdapter = (options: CreateShAdapterOptions = {}): SourceAda
       const response = await fetchImpl(SH_NOTICE_LIST_URL);
       const html = await response.text();
       const notices = parseShNoticeListHtml(html);
-      return notices.length > 0 ? notices : SH_FIXTURE;
+      const result = notices.length > 0 ? notices : SH_FIXTURE;
+      noticesById.clear();
+      result.forEach((notice) => noticesById.set(notice.sourceId, notice));
+      return result;
     },
     async fetchNoticeDetails(id: string) {
-      // TODO: Fetch and parse the SH detail page for individual notice records.
-      return SH_FIXTURE.find((notice) => notice.sourceId === id) ?? null;
+      const notice = noticesById.get(id) ?? SH_FIXTURE.find((fixture) => fixture.sourceId === id);
+      if (!notice?.sourceUrl) {
+        return notice ?? null;
+      }
+
+      const response = await fetchImpl(notice.sourceUrl);
+      const html = await response.text();
+      return parseShNoticeDetailHtml(html, notice);
     },
   };
 };

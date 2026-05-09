@@ -12,7 +12,12 @@ import {
   parseLhNoticeListHtml,
   type CreateLhAdapterOptions,
 } from '../src/adapters/lh.js';
-import { createShAdapter, parseShNoticeListHtml, type CreateShAdapterOptions } from '../src/adapters/sh.js';
+import {
+  createShAdapter,
+  parseShNoticeDetailHtml,
+  parseShNoticeListHtml,
+  type CreateShAdapterOptions,
+} from '../src/adapters/sh.js';
 import { ListingSchema, NoticeSchema } from '../src/types.js';
 
 describe('core domain schemas', () => {
@@ -592,6 +597,65 @@ describe('adapter contract', () => {
         ],
       },
     ]);
+  });
+
+  it('parses SH detail pages into attachment metadata', () => {
+    const notice = {
+      sourceId: '304116',
+      title: '제7차 장기전세주택2 청약접수 결과 안내',
+      status: 'posted',
+      region: '서울',
+      postedAt: '2026-05-08',
+      sourceUrl: 'https://www.i-sh.co.kr/main/view.do?seq=304116',
+      metadata: {
+        provider: 'SH',
+        rawIds: { seq: '304116' },
+      },
+      listings: [
+        {
+          title: '제7차 장기전세주택2 청약접수 결과 안내',
+          region: '서울',
+          status: 'posted',
+        },
+      ],
+    };
+    const html = `
+      <table>
+        <tr><th>등록일</th><td>2026-05-08</td></tr>
+        <tr>
+          <th>첨부</th>
+          <td>
+            <a href="#">.pdf</a>
+            <a href="#">청약경쟁률.pdf</a>
+            <a href="/main/com/util/htmlConverter.do?brd_id=GS0401&amp;seq=304116&amp;file_seq=1">미리보기</a>
+            <a href="https://www.i-sh.co.kr/files/guide.xlsx">단지별 결과.xlsx</a>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            제7차 장기전세주택2 최종 청약접수 결과를 아래와 같이 게시합니다.
+          </td>
+        </tr>
+      </table>
+    `;
+
+    expect(parseShNoticeDetailHtml(html, notice)).toMatchObject({
+      metadata: {
+        provider: 'SH',
+        rawIds: { seq: '304116' },
+        attachments: [
+          {
+            title: '청약경쟁률.pdf',
+            url: 'https://www.i-sh.co.kr/main/com/util/htmlConverter.do?brd_id=GS0401&seq=304116&file_seq=1',
+          },
+          {
+            title: '단지별 결과.xlsx',
+            url: 'https://www.i-sh.co.kr/files/guide.xlsx',
+          },
+        ],
+        bodyPreview: '등록일 2026-05-08 첨부 청약경쟁률.pdf 단지별 결과.xlsx 제7차 장기전세주택2 최종 청약접수 결과를 아래와 같이 게시합니다.',
+      },
+    });
   });
 });
 
