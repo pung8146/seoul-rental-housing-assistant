@@ -31,6 +31,8 @@ const toMessage = (error: unknown): string => {
   return 'unknown error';
 };
 
+const DETAIL_FETCH_CONCURRENCY = 5;
+
 export const createDefaultAdapters = (): SourceAdapter[] => [createLhAdapter(), createShAdapter()];
 
 export const formatCollectResult = (result: RunCollectResult): string =>
@@ -45,9 +47,15 @@ const hydrateNoticeDetails = async (
   }
 
   const hydrated: RawNoticeCandidate[] = [];
-  for (const rawNotice of rawNotices) {
-    const detailedNotice = await adapter.fetchNoticeDetails(rawNotice.sourceId);
-    hydrated.push(detailedNotice ?? rawNotice);
+  for (let index = 0; index < rawNotices.length; index += DETAIL_FETCH_CONCURRENCY) {
+    const chunk = rawNotices.slice(index, index + DETAIL_FETCH_CONCURRENCY);
+    const detailedChunk = await Promise.all(
+      chunk.map(async (rawNotice) => {
+        const detailedNotice = await adapter.fetchNoticeDetails?.(rawNotice.sourceId);
+        return detailedNotice ?? rawNotice;
+      }),
+    );
+    hydrated.push(...detailedChunk);
   }
 
   return hydrated;

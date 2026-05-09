@@ -10,6 +10,7 @@ const toMessage = (error) => {
     }
     return 'unknown error';
 };
+const DETAIL_FETCH_CONCURRENCY = 5;
 export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
 export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 const hydrateNoticeDetails = async (adapter, rawNotices) => {
@@ -17,9 +18,13 @@ const hydrateNoticeDetails = async (adapter, rawNotices) => {
         return rawNotices;
     }
     const hydrated = [];
-    for (const rawNotice of rawNotices) {
-        const detailedNotice = await adapter.fetchNoticeDetails(rawNotice.sourceId);
-        hydrated.push(detailedNotice ?? rawNotice);
+    for (let index = 0; index < rawNotices.length; index += DETAIL_FETCH_CONCURRENCY) {
+        const chunk = rawNotices.slice(index, index + DETAIL_FETCH_CONCURRENCY);
+        const detailedChunk = await Promise.all(chunk.map(async (rawNotice) => {
+            const detailedNotice = await adapter.fetchNoticeDetails?.(rawNotice.sourceId);
+            return detailedNotice ?? rawNotice;
+        }));
+        hydrated.push(...detailedChunk);
     }
     return hydrated;
 };

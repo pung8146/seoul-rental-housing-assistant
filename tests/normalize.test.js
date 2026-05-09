@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeAdapterOutput, normalizeRegion, parseNumber, parseTags, } from '../src/domain/normalize.js';
-import { createLhAdapter, parseLhNoticeListHtml } from '../src/adapters/lh.js';
+import { createLhAdapter, parseLhNoticeDetailHtml, parseLhNoticeListHtml, } from '../src/adapters/lh.js';
 import { createShAdapter, parseShNoticeListHtml } from '../src/adapters/sh.js';
 import { ListingSchema, NoticeSchema } from '../src/types.js';
 describe('core domain schemas', () => {
@@ -306,6 +306,123 @@ describe('adapter contract', () => {
                         },
                     },
                 ],
+            },
+        ]);
+    });
+    it('parses LH detail tables into listing rows', () => {
+        const notice = {
+            sourceId: '2015122300019916',
+            title: '고령자복지주택 예비입주자 모집',
+            status: '공고중',
+            region: '경북',
+            postedAt: '2026-05-08',
+            sourceUrl: 'https://apply.lh.or.kr/detail',
+            metadata: {
+                provider: 'LH',
+                rawIds: { dataId1: '2015122300019916' },
+            },
+            listings: [
+                {
+                    title: '목록 placeholder',
+                    supplyType: '고령자복지주택',
+                    region: '경북',
+                    status: '공고중',
+                },
+            ],
+        };
+        const html = `
+      <script>
+        var contentString_0 = ' 경상북도 경주시 안강읍 화전길 61-2 ';
+      </script>
+      <table>
+        <caption>주택형 안내 : 주택형, 전용면적, 세대수, 금회공급 세대수, 임대보증금, 월임대료</caption>
+        <thead>
+          <tr>
+            <th>주택형</th>
+            <th>전용면적(㎡)</th>
+            <th>세대수</th>
+            <th>금회공급 세대수</th>
+            <th>임대보증금(원)</th>
+            <th>월임대료(원)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>26A</td>
+            <td>26.4</td>
+            <td>103</td>
+            <td>20</td>
+            <td>10,000,000</td>
+            <td>250,000</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+        expect(parseLhNoticeDetailHtml(html, notice)).toMatchObject({
+            sourceId: '2015122300019916',
+            title: '고령자복지주택 예비입주자 모집',
+            listings: [
+                {
+                    title: '고령자복지주택 예비입주자 모집 26A',
+                    supplyType: '26A',
+                    region: '경북',
+                    deposit: '10,000,000',
+                    monthlyRent: '250,000',
+                    floorAreaM2: '26.4',
+                    status: '공고중',
+                    metadata: {
+                        building: '경상북도 경주시 안강읍 화전길 61-2',
+                        rawIds: { dataId1: '2015122300019916' },
+                    },
+                },
+            ],
+        });
+    });
+    it('fetches LH notice details from the list-provided detail URL', async () => {
+        const listHtml = `
+      <table>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>국민임대</td>
+            <td>
+              <a href="javascript:" data-id1="2015122300019916" data-id2="03" data-id3="06" data-id4="09" class="wrtancInfoBtn">
+                <span>고령자복지주택 예비입주자 모집</span>
+              </a>
+            </td>
+            <td>경북</td>
+            <td>2026.05.08</td>
+            <td>2026.05.21</td>
+            <td>공고중</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+        const detailHtml = `
+      <script>var contentString_0 = ' 경상북도 경주시 안강읍 화전길 61-2 ';</script>
+      <table>
+        <tr><th>주택형</th><th>전용면적(㎡)</th><th>임대보증금(원)</th><th>월임대료(원)</th></tr>
+        <tr><td>26A</td><td>26.4</td><td>10,000,000</td><td>250,000</td></tr>
+      </table>
+    `;
+        const fetchCalls = [];
+        const fetchImpl = async (input, init) => {
+            fetchCalls.push({ input, init });
+            return new Response(fetchCalls.length === 1 ? listHtml : detailHtml, {
+                status: 200,
+                headers: { 'Content-Type': 'text/html; charset=utf-8' },
+            });
+        };
+        const adapter = createLhAdapter({ fetch: fetchImpl });
+        await adapter.fetchNotices();
+        const detail = await adapter.fetchNoticeDetails?.('2015122300019916');
+        expect(fetchCalls[1]?.input).toBe('https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?ccrCnntSysDsCd=03&panId=2015122300019916&aisTpCd=09&uppAisTpCd=06&mi=1026&panKdCd=&otxtPanId=');
+        expect(detail?.listings).toMatchObject([
+            {
+                title: '고령자복지주택 예비입주자 모집 26A',
+                deposit: '10,000,000',
+                monthlyRent: '250,000',
+                floorAreaM2: '26.4',
             },
         ]);
     });

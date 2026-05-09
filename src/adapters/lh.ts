@@ -12,7 +12,17 @@ export type CreateLhAdapterOptions = {
 
 const extractCells = (rowHtml: string): string[] => {
   const matches = Array.from(rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi));
-  return matches.map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim());
+  return matches.map((match) => stripHtml(match[1]));
+};
+
+const extractHeaderCells = (rowHtml: string): string[] => {
+  const matches = Array.from(rowHtml.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi));
+  return matches.map((match) => stripHtml(match[1]));
+};
+
+const stripHtml = (html: string): string => {
+  const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  return withoutScripts.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
 };
 
 const extractAttribute = (html: string, name: string): string | null => {
@@ -119,6 +129,67 @@ export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
   return notices;
 };
 
+const findHeaderIndex = (headers: string[], candidates: string[]): number =>
+  headers.findIndex((header) => candidates.some((candidate) => header.includes(candidate)));
+
+const extractDetailBuildings = (html: string): string[] =>
+  Array.from(html.matchAll(/contentString_\d+\s*=\s*['"]([^'"]+)['"]/gi))
+    .map((match) => stripHtml(match[1]))
+    .filter((value) => !value.startsWith('<') && !value.includes('\\'))
+    .filter(Boolean);
+
+export const parseLhNoticeDetailHtml = (html: string, notice: RawNoticeCandidate): RawNoticeCandidate => {
+  const tables = Array.from(html.matchAll(/<table\b[\s\S]*?<\/table>/gi));
+  const buildings = extractDetailBuildings(html);
+  const listings = tables.flatMap((tableMatch, tableIndex) => {
+    const tableHtml = tableMatch[0];
+    const headers = Array.from(tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))
+      .flatMap(([, rowHtml]) => extractHeaderCells(rowHtml))
+      .filter(Boolean);
+
+    if (!headers.some((header) => header.includes('주택형'))) {
+      return [];
+    }
+
+    const typeIndex = findHeaderIndex(headers, ['주택형']);
+    const areaIndex = findHeaderIndex(headers, ['전용면적']);
+    const depositIndex = findHeaderIndex(headers, ['임대보증금']);
+    const rentIndex = findHeaderIndex(headers, ['월임대료']);
+    const supplyCountIndex = findHeaderIndex(headers, ['금회공급']);
+    const rows = Array.from(tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
+
+    return rows
+      .map(([, rowHtml]) => [...extractHeaderCells(rowHtml), ...extractCells(rowHtml)])
+      .filter((cells) => cells.length > 0)
+      .filter((cells) => cells.some((cell) => !headers.includes(cell)))
+      .map((cells) => {
+        const housingType = cells[typeIndex] ?? '';
+        const building = buildings[tableIndex];
+
+        return {
+          title: [notice.title, housingType].filter(Boolean).join(' '),
+          supplyType: housingType,
+          region: notice.region,
+          targetTags: notice.targetTags,
+          deposit: cells[depositIndex],
+          monthlyRent: cells[rentIndex],
+          floorAreaM2: cells[areaIndex],
+          status: notice.status,
+          metadata: {
+            ...(notice.metadata ?? {}),
+            building,
+            supplyCount: supplyCountIndex >= 0 ? cells[supplyCountIndex] : undefined,
+          },
+        };
+      });
+  });
+
+  return {
+    ...notice,
+    listings: listings.length > 0 ? listings : notice.listings,
+  };
+};
+
 const LH_FIXTURE: RawNoticeCandidate[] = [
   {
     sourceId: 'lh-notice-1',
@@ -149,6 +220,7 @@ const LH_FIXTURE: RawNoticeCandidate[] = [
 
 export const createLhAdapter = (options: CreateLhAdapterOptions = {}): SourceAdapter => {
   const fetchImpl = options.fetch ?? fetch;
+  const noticesById = new Map<string, RawNoticeCandidate>();
 
   return {
     source: 'lh',
@@ -156,11 +228,20 @@ export const createLhAdapter = (options: CreateLhAdapterOptions = {}): SourceAda
       const response = await fetchImpl(LH_NOTICE_LIST_URL);
       const html = await response.text();
       const notices = parseLhNoticeListHtml(html);
-      return notices.length > 0 ? notices : LH_FIXTURE;
+      const result = notices.length > 0 ? notices : LH_FIXTURE;
+      noticesById.clear();
+      result.forEach((notice) => noticesById.set(notice.sourceId, notice));
+      return result;
     },
     async fetchNoticeDetails(id: string) {
-      // TODO: Fetch and parse the LH detail page for individual notice records.
-      return LH_FIXTURE.find((notice) => notice.sourceId === id) ?? null;
+      const notice = noticesById.get(id) ?? LH_FIXTURE.find((fixture) => fixture.sourceId === id);
+      if (!notice?.sourceUrl) {
+        return notice ?? null;
+      }
+
+      const response = await fetchImpl(notice.sourceUrl);
+      const html = await response.text();
+      return parseLhNoticeDetailHtml(html, notice);
     },
   };
 };

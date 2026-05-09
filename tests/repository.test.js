@@ -268,6 +268,37 @@ describe('sqlite repository', () => {
             }),
         ]);
     });
+    it('fetches notice details with limited parallelism', async () => {
+        const repository = createRepository(':memory:');
+        let active = 0;
+        let maxActive = 0;
+        const adapter = {
+            source: 'lh',
+            async fetchNotices() {
+                return Array.from({ length: 8 }, (_, index) => ({
+                    sourceId: `notice-${index + 1}`,
+                    title: `공고 ${index + 1}`,
+                    region: '서울',
+                    listings: [{ title: `목록 ${index + 1}` }],
+                }));
+            },
+            async fetchNoticeDetails(id) {
+                active += 1;
+                maxActive = Math.max(maxActive, active);
+                await new Promise((resolve) => setTimeout(resolve, 10));
+                active -= 1;
+                return {
+                    sourceId: id,
+                    title: id,
+                    region: '서울',
+                    listings: [{ title: `상세 ${id}` }],
+                };
+            },
+        };
+        await runCollect({ repository, adapters: [adapter] });
+        expect(maxActive).toBeGreaterThan(1);
+        expect(maxActive).toBeLessThanOrEqual(5);
+    });
     it('collects live LH adapter notices without missing downstream-required fields', async () => {
         const repository = createRepository(':memory:');
         const html = `
