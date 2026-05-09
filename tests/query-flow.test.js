@@ -83,6 +83,37 @@ describe('runQuery', () => {
         expect(result.text).toContain('1. 201호');
         expect(result.text).toContain('2. 202호');
     });
+    it('uses the previously shown notice list for numbered detail requests', () => {
+        const repository = createRepository(':memory:');
+        const notices = [makeNotice(1), makeNotice(2), makeNotice(3)];
+        notices.forEach((notice) => {
+            repository.upsertNotice(notice);
+        });
+        repository.upsertListing(makeListing(notices[0], 1, { title: '서울 상세 매물' }));
+        repository.upsertListing(makeListing(notices[1], 1, { title: '경기 상세 매물' }));
+        const listResult = runQuery({
+            repository,
+            command: {
+                intent: 'list',
+                filters: { region: '서울' },
+            },
+        });
+        const detailResult = runQuery({
+            repository,
+            command: {
+                intent: 'detail',
+                index: 2,
+            },
+            previousNotices: listResult.notices,
+        });
+        expect(listResult.lines).toEqual([
+            expect.stringContaining('1. 공고 3'),
+            expect.stringContaining('2. 공고 1'),
+        ]);
+        expect(detailResult.text).toContain('공고 1');
+        expect(detailResult.text).toContain('서울 상세 매물');
+        expect(detailResult.text).not.toContain('경기 상세 매물');
+    });
     it('returns only source url for link-only intent', () => {
         const repository = createRepository(':memory:');
         const notices = [makeNotice(1), makeNotice(2)];

@@ -7,6 +7,7 @@ import type { Notice } from '../types.js';
 type RunQueryInput = {
   repository: Pick<Repository, 'queryNotices' | 'queryListingsByNotice'>;
   command: ParsedCommand;
+  previousNotices?: Notice[];
 };
 
 type RunQueryResult = {
@@ -18,12 +19,13 @@ type RunQueryResult = {
 type RunQueryTextInput = {
   repository: Pick<Repository, 'queryNotices' | 'queryListingsByNotice'>;
   input: string;
+  previousNotices?: Notice[];
 };
 
 const MAX_SUMMARY_COUNT = 5;
 
-const selectNotices = (repository: Pick<Repository, 'queryNotices'>, index?: number) => {
-  const notices = repository.queryNotices({});
+const selectNotices = (repository: Pick<Repository, 'queryNotices'>, index?: number, previousNotices?: Notice[]) => {
+  const notices = previousNotices ?? repository.queryNotices({});
   if (typeof index === 'number') {
     return { notices, selected: notices[index - 1] ?? null };
   }
@@ -31,7 +33,7 @@ const selectNotices = (repository: Pick<Repository, 'queryNotices'>, index?: num
   return { notices, selected: null };
 };
 
-export const runQuery = ({ repository, command }: RunQueryInput): RunQueryResult => {
+export const runQuery = ({ repository, command, previousNotices }: RunQueryInput): RunQueryResult => {
   if (command.intent === 'list') {
     const notices = repository.queryNotices(command.filters).slice(0, MAX_SUMMARY_COUNT);
     const lines = notices.map((notice, index) => formatNoticeSummaryLine(notice, index + 1));
@@ -51,7 +53,7 @@ export const runQuery = ({ repository, command }: RunQueryInput): RunQueryResult
     };
   }
 
-  const { notices, selected } = selectNotices(repository, command.index);
+  const { notices, selected } = selectNotices(repository, command.index, previousNotices);
 
   if (!selected) {
     return {
@@ -79,8 +81,8 @@ export const runQuery = ({ repository, command }: RunQueryInput): RunQueryResult
   };
 };
 
-export const runQueryText = ({ repository, input }: RunQueryTextInput): RunQueryResult =>
-  runQuery({ repository, command: parseCommand(input) });
+export const runQueryText = ({ repository, input, previousNotices }: RunQueryTextInput): RunQueryResult =>
+  runQuery({ repository, command: parseCommand(input), previousNotices });
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');

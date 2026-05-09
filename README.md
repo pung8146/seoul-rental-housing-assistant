@@ -35,6 +35,8 @@ npm run answer -- 1번 자세히
 npm run answer -- 2번 링크만
 ```
 
+번호형 후속 질문은 방금 받은 목록 기준입니다. 예를 들어 `서울만 보여줘` 응답에서 2번으로 보인 공고는, 다음 `2번 자세히`에서도 같은 공고를 가리킵니다. `answer`는 이를 위해 기본적으로 `.rental-housing-context.json`에 마지막 목록을 저장합니다. 다른 위치를 쓰려면 `RENTAL_HOUSING_CONTEXT_PATH=/path/to/context.json`을 지정합니다.
+
 ## 개별 명령
 
 ```bash

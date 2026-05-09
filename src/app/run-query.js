@@ -2,14 +2,14 @@ import { createRepository } from '../db/repository.js';
 import { parseCommand } from '../commands/parse.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 const MAX_SUMMARY_COUNT = 5;
-const selectNotices = (repository, index) => {
-    const notices = repository.queryNotices({});
+const selectNotices = (repository, index, previousNotices) => {
+    const notices = previousNotices ?? repository.queryNotices({});
     if (typeof index === 'number') {
         return { notices, selected: notices[index - 1] ?? null };
     }
     return { notices, selected: null };
 };
-export const runQuery = ({ repository, command }) => {
+export const runQuery = ({ repository, command, previousNotices }) => {
     if (command.intent === 'list') {
         const notices = repository.queryNotices(command.filters).slice(0, MAX_SUMMARY_COUNT);
         const lines = notices.map((notice, index) => formatNoticeSummaryLine(notice, index + 1));
@@ -26,7 +26,7 @@ export const runQuery = ({ repository, command }) => {
             notices,
         };
     }
-    const { notices, selected } = selectNotices(repository, command.index);
+    const { notices, selected } = selectNotices(repository, command.index, previousNotices);
     if (!selected) {
         return {
             text: '',
@@ -49,7 +49,7 @@ export const runQuery = ({ repository, command }) => {
         notices,
     };
 };
-export const runQueryText = ({ repository, input }) => runQuery({ repository, command: parseCommand(input) });
+export const runQueryText = ({ repository, input, previousNotices }) => runQuery({ repository, command: parseCommand(input), previousNotices });
 if (import.meta.url === `file://${process.argv[1]}`) {
     const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
     try {

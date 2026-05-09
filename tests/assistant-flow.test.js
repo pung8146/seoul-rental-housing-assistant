@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { runAssistantText } from '../src/app/run-assistant.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { loadAssistantContext, runAssistantText, saveAssistantContext } from '../src/app/run-assistant.js';
 import { createRepository } from '../src/db/repository.js';
-const makeNotice = (index) => ({
+const makeNotice = (index, overrides = {}) => ({
     source: 'lh',
     sourceId: `notice-${index}`,
     title: `서울 청년 임대주택 ${index}`,
@@ -15,6 +18,23 @@ const makeNotice = (index) => ({
     applicationEndAt: null,
     sourceUrl: `https://example.com/notices/${index}`,
     metadata: {},
+    ...overrides,
+});
+const makeListing = (notice, index, overrides = {}) => ({
+    source: notice.source,
+    noticeSourceId: notice.sourceId,
+    title: `${notice.title} 매물 ${index}`,
+    stableKey: `listing:${notice.sourceId}:${index}`,
+    changeHash: `listing-hash:${notice.sourceId}:${index}`,
+    supplyType: '행복주택',
+    region: notice.region,
+    targetTags: notice.targetTags,
+    deposit: 10000000 * index,
+    monthlyRent: 200000 * index,
+    floorAreaM2: 30 + index,
+    status: '공급중',
+    metadata: {},
+    ...overrides,
 });
 describe('runAssistantText', () => {
     it('collects fresh notices when the user asks for the latest data', async () => {
@@ -59,5 +79,46 @@ describe('runAssistantText', () => {
         expect(result.mode).toBe('query');
         expect(result.text).toContain('1. 서울 청년 임대주택 2');
         expect(result.text).toContain('2. 서울 청년 임대주택 1');
+    });
+    it('carries the shown list forward for follow-up detail questions', async () => {
+        const repository = createRepository(':memory:');
+        const context = { notices: [] };
+        const notices = [
+            makeNotice(1),
+            makeNotice(2, { region: '경기', title: '경기 청년 임대주택 2' }),
+            makeNotice(3),
+        ];
+        notices.forEach((notice) => repository.upsertNotice(notice));
+        repository.upsertListing(makeListing(notices[0], 1, { title: '서울 1번 상세' }));
+        repository.upsertListing(makeListing(notices[1], 1, { title: '경기 상세' }));
+        const listResult = await runAssistantText({
+            repository,
+            adapters: [],
+            input: '서울만 보여줘',
+            context,
+        });
+        const detailResult = await runAssistantText({
+            repository,
+            adapters: [],
+            input: '2번 자세히',
+            context,
+        });
+        expect(listResult.text).toContain('1. 서울 청년 임대주택 3');
+        expect(listResult.text).toContain('2. 서울 청년 임대주택 1');
+        expect(detailResult.text).toContain('서울 청년 임대주택 1');
+        expect(detailResult.text).toContain('서울 1번 상세');
+        expect(detailResult.text).not.toContain('경기 상세');
+    });
+    it('persists the shown list so separate answer invocations can use it', () => {
+        const directory = mkdtempSync(join(tmpdir(), 'rental-housing-context-'));
+        const contextPath = join(directory, 'context.json');
+        const notice = makeNotice(1);
+        try {
+            saveAssistantContext(contextPath, { notices: [notice] });
+            expect(loadAssistantContext(contextPath)).toEqual({ notices: [notice] });
+        }
+        finally {
+            rmSync(directory, { recursive: true, force: true });
+        }
     });
 });
