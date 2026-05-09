@@ -15,4 +15,12 @@ describe('project bootstrap', () => {
     expect(packageJson.scripts.answer).toBe('tsx src/app/run-assistant.ts');
     expect(readme).toContain('npm run answer -- 최신 공고 확인해줘');
   });
+
+  it('provides a stable OpenClaw wrapper script', () => {
+    const script = readFileSync('scripts/openclaw-answer.sh', 'utf8');
+
+    expect(script).toContain('RENTAL_HOUSING_DB_PATH');
+    expect(script).toContain('RENTAL_HOUSING_CONTEXT_PATH');
+    expect(script).toContain('npm run answer -- "$@"');
+  });
 });

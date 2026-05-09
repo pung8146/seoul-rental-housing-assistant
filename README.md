@@ -37,6 +37,14 @@ npm run answer -- 2번 링크만
 
 번호형 후속 질문은 방금 받은 목록 기준입니다. 예를 들어 `서울만 보여줘` 응답에서 2번으로 보인 공고는, 다음 `2번 자세히`에서도 같은 공고를 가리킵니다. `answer`는 이를 위해 기본적으로 `.rental-housing-context.json`에 마지막 목록을 저장합니다. 다른 위치를 쓰려면 `RENTAL_HOUSING_CONTEXT_PATH=/path/to/context.json`을 지정합니다.
 
+OpenClaw에서 호출할 때는 고정 래퍼를 쓰면 됩니다.
+
+```bash
+/home/pung8146/.openclaw/workspace/apps/rental-housing-assistant/scripts/openclaw-answer.sh 서울만 보여줘
+```
+
+래퍼는 DB와 마지막 목록 상태를 기본적으로 `/home/pung8146/.openclaw/rental-housing-assistant/` 아래에 저장합니다.
+
 ## 개별 명령
 
 ```bash
@@ -65,5 +73,6 @@ npm run query -- 서울만 보여줘
 - 텔레그램용 수집 요약
 - 자연어/옵션형 조회
 - OpenClaw/텔레그램 호출용 `answer` 진입점
+- LH 상세 테이블 기반 주택형/면적/보증금/월세 파싱
 
-아직 공고 상세 페이지의 보증금, 월세, 면적 같은 세부 테이블 파싱은 다음 단계로 남아 있습니다.
+다음 단계 후보는 SH 상세 페이지 파싱 또는 OpenClaw 에이전트 지침에 이 래퍼 호출 규칙을 등록하는 작업입니다.
