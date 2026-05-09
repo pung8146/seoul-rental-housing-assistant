@@ -11,7 +11,7 @@ const toMessage = (error) => {
     return 'unknown error';
 };
 export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
-export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures);
+export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 export const runCollect = async ({ adapters, repository }) => {
     const events = [];
     const failures = [];

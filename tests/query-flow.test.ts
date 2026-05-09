@@ -61,6 +61,21 @@ describe('runQuery', () => {
     expect(result.text).not.toContain('공고 1');
   });
 
+  it('returns a readable empty message when list filters match nothing', () => {
+    const repository = createRepository(':memory:');
+
+    const result = runQuery({
+      repository,
+      command: {
+        intent: 'list',
+        filters: { region: '서울' },
+      },
+    });
+
+    expect(result.text).toBe('조건에 맞는 공고 없음');
+    expect(result.lines).toEqual(['조건에 맞는 공고 없음']);
+  });
+
   it('returns listing rows for detail intent', () => {
     const repository = createRepository(':memory:');
     const notices = [makeNotice(1), makeNotice(2)];

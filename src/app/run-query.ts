@@ -36,6 +36,14 @@ export const runQuery = ({ repository, command }: RunQueryInput): RunQueryResult
     const notices = repository.queryNotices(command.filters).slice(0, MAX_SUMMARY_COUNT);
     const lines = notices.map((notice, index) => formatNoticeSummaryLine(notice, index + 1));
 
+    if (lines.length === 0) {
+      return {
+        text: '조건에 맞는 공고 없음',
+        lines: ['조건에 맞는 공고 없음'],
+        notices,
+      };
+    }
+
     return {
       text: lines.join('\n'),
       lines,

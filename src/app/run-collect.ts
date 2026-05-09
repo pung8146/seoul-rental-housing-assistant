@@ -33,7 +33,7 @@ const toMessage = (error: unknown): string => {
 export const createDefaultAdapters = (): SourceAdapter[] => [createLhAdapter(), createShAdapter()];
 
 export const formatCollectResult = (result: RunCollectResult): string =>
-  formatDailySummary(result.events, result.failures);
+  formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 
 export const runCollect = async ({ adapters, repository }: RunCollectInput): Promise<RunCollectResult> => {
   const events: NotificationEvent[] = [];

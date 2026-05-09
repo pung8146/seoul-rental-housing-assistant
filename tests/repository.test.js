@@ -57,6 +57,9 @@ describe('sqlite repository', () => {
         expect(text).toContain('서울 청년 임대주택 모집');
         expect(text).toContain('https://example.com/notices/1');
     });
+    it('formats empty collection results as a Telegram-safe message', () => {
+        expect(formatCollectResult({ events: [], failures: [] })).toBe('새 공고/변경 없음');
+    });
     it('initializes schema successfully', () => {
         const repository = createRepository(':memory:');
         expect(repository.queryNotices({})).toEqual([]);
