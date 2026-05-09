@@ -92,6 +92,37 @@ describe('runAssistantText', () => {
     expect(result.text).toContain('2. 서울 청년 임대주택 1');
   });
 
+  it('collects before answering a list query when the database is empty', async () => {
+    const repository = createRepository(':memory:');
+    const adapters: SourceAdapter[] = [
+      {
+        source: 'lh',
+        async fetchNotices() {
+          return [
+            {
+              sourceId: 'notice-1',
+              title: '서울 청년 임대주택 1',
+              region: '서울',
+              targetTags: ['청년'],
+              postedAt: '2026-05-01',
+              sourceUrl: 'https://example.com/notices/1',
+              listings: [],
+            },
+          ];
+        },
+      },
+    ];
+
+    const result = await runAssistantText({
+      repository,
+      adapters,
+      input: '서울만 보여줘',
+    });
+
+    expect(result.mode).toBe('query');
+    expect(result.text).toContain('1. 서울 청년 임대주택 1');
+  });
+
   it('carries the shown list forward for follow-up detail questions', async () => {
     const repository = createRepository(':memory:');
     const context = { notices: [] as Notice[] };

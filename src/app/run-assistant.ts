@@ -26,6 +26,8 @@ type RunAssistantTextResult = {
 const isCollectRequest = (input: string): boolean =>
   /(최신|새로고침|수집|업데이트|갱신)/.test(input);
 
+const isEmptyListResult = (text: string): boolean => text === '조건에 맞는 공고 없음';
+
 export const loadAssistantContext = (path: string): AssistantContext => {
   if (!existsSync(path)) {
     return { notices: [] };
@@ -57,7 +59,11 @@ export const runAssistantText = async ({
     };
   }
 
-  const result = runQueryText({ repository, input, previousNotices: context?.notices });
+  let result = runQueryText({ repository, input, previousNotices: context?.notices });
+  if (isEmptyListResult(result.text) && repository.queryNotices({}).length === 0 && adapters.length > 0) {
+    await runCollect({ repository, adapters });
+    result = runQueryText({ repository, input, previousNotices: context?.notices });
+  }
   if (context) {
     context.notices = result.notices;
   }
