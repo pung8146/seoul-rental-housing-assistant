@@ -1,6 +1,7 @@
 import { createRepository, type Repository } from '../db/repository.js';
 import { parseCommand } from '../commands/parse.js';
 import type { ParsedCommand } from '../commands/parse.js';
+import { isActionableNotice } from '../domain/actionable.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 import type { Notice } from '../types.js';
 
@@ -25,7 +26,7 @@ type RunQueryTextInput = {
 const MAX_SUMMARY_COUNT = 5;
 
 const selectNotices = (repository: Pick<Repository, 'queryNotices'>, index?: number, previousNotices?: Notice[]) => {
-  const notices = previousNotices ?? repository.queryNotices({});
+  const notices = previousNotices ?? repository.queryNotices({}).filter(isActionableNotice);
   if (typeof index === 'number') {
     return { notices, selected: notices[index - 1] ?? null };
   }
@@ -35,7 +36,7 @@ const selectNotices = (repository: Pick<Repository, 'queryNotices'>, index?: num
 
 export const runQuery = ({ repository, command, previousNotices }: RunQueryInput): RunQueryResult => {
   if (command.intent === 'list') {
-    const notices = repository.queryNotices(command.filters).slice(0, MAX_SUMMARY_COUNT);
+    const notices = repository.queryNotices(command.filters).filter(isActionableNotice).slice(0, MAX_SUMMARY_COUNT);
     const lines = notices.map((notice, index) => formatNoticeSummaryLine(notice, index + 1));
 
     if (lines.length === 0) {

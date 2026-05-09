@@ -11,7 +11,7 @@ import type { Listing, Notice } from '../src/types.js';
 const makeNotice = (index: number, overrides: Partial<Notice> = {}): Notice => ({
   source: 'lh',
   sourceId: `notice-${index}`,
-  title: `서울 청년 임대주택 ${index}`,
+  title: `서울 청년 임대주택 ${index} 입주자 모집공고`,
   stableKey: `notice:${index}`,
   changeHash: `notice-hash-${index}`,
   status: '모집중',
@@ -52,7 +52,7 @@ describe('runAssistantText', () => {
           return [
             {
               sourceId: 'notice-1',
-              title: '서울 청년 임대주택 1',
+              title: '서울 청년 임대주택 1 입주자 모집공고',
               region: '서울',
               targetTags: ['청년'],
               postedAt: '2026-05-01',
@@ -101,7 +101,7 @@ describe('runAssistantText', () => {
           return [
             {
               sourceId: 'notice-1',
-              title: '서울 청년 임대주택 1',
+              title: '서울 청년 임대주택 1 입주자 모집공고',
               region: '서울',
               targetTags: ['청년'],
               postedAt: '2026-05-01',
@@ -128,7 +128,7 @@ describe('runAssistantText', () => {
     const context = { notices: [] as Notice[] };
     const notices = [
       makeNotice(1),
-      makeNotice(2, { region: '경기', title: '경기 청년 임대주택 2' }),
+      makeNotice(2, { region: '경기', title: '경기 청년 임대주택 2 입주자 모집공고' }),
       makeNotice(3),
     ];
 

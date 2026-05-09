@@ -1,3 +1,4 @@
+import { isActionableNoticeTitle } from '../domain/actionable.js';
 const SH_PROVIDER = 'SH';
 const SH_NOTICE_LIST_URL = 'https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/list.do?multi_itm_seq=2';
 const SH_NOTICE_DETAIL_BASE_URL = 'https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?multi_itm_seq=2';
@@ -28,6 +29,9 @@ export const parseShNoticeListHtml = (html) => {
         const [, seq] = detailMatch;
         const cells = extractCells(rowHtml);
         const title = extractTitle(rowHtml);
+        if (!isActionableNoticeTitle(title)) {
+            continue;
+        }
         const department = cells.at(-3) ?? '';
         const postedAt = cells.find((cell) => /^\d{4}-\d{2}-\d{2}$/.test(cell)) ?? '';
         const sourceUrl = `${SH_NOTICE_DETAIL_BASE_URL}&seq=${encodeURIComponent(seq)}`;

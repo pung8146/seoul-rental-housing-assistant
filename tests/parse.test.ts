@@ -38,6 +38,11 @@ describe('parseCommand', () => {
       intent: 'detail',
       index: 1,
     });
+
+    expect(parseCommand('1번')).toEqual({
+      intent: 'detail',
+      index: 1,
+    });
   });
 
   it('parses link-only requests', () => {

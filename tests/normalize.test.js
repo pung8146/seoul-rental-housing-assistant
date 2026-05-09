@@ -96,7 +96,7 @@ describe('adapter contract', () => {
               <tr>
                 <td>1</td>
                 <td class="txtL">
-                  <a href="#" onclick="javascript:getDetailView('sh-contract');return false;">SH contract notice</a>
+                <a href="#" onclick="javascript:getDetailView('sh-contract');return false;">SH contract 모집공고</a>
                 </td>
                 <td>Rental Team</td>
                 <td>2026-05-08</td>
@@ -434,7 +434,7 @@ describe('adapter contract', () => {
             <td>1607</td>
             <td class="txtL">
               <a href="#" class="ellipsis" onclick="javascript:getDetailView('304116');return false;">
-                2026 SH rental housing notice
+                2026 SH rental housing 모집공고
               </a>
             </td>
             <td>Rental Supply Team</td>
@@ -447,7 +447,7 @@ describe('adapter contract', () => {
         expect(parseShNoticeListHtml(html)).toEqual([
             {
                 sourceId: '304116',
-                title: '2026 SH rental housing notice',
+                title: '2026 SH rental housing 모집공고',
                 status: 'posted',
                 region: '서울',
                 postedAt: '2026-05-08',
@@ -461,7 +461,7 @@ describe('adapter contract', () => {
                 },
                 listings: [
                     {
-                        title: '2026 SH rental housing notice',
+                        title: '2026 SH rental housing 모집공고',
                         supplyType: 'Rental Supply Team',
                         region: '서울',
                         status: 'posted',
@@ -475,6 +475,62 @@ describe('adapter contract', () => {
             },
         ]);
     });
+    it('ignores SH rows that are announcements or application results', () => {
+        const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>1609</td>
+            <td class="txtL">
+              <a href="#" class="ellipsis" onclick="javascript:getDetailView('304118');return false;">
+                전산작업에 따른 서비스(신한인증서) 이용 안내
+              </a>
+            </td>
+            <td>IT Team</td>
+            <td class="num">2026-05-09</td>
+            <td class="num">100</td>
+          </tr>
+          <tr>
+            <td>1610</td>
+            <td class="txtL">
+              <a href="#" class="ellipsis" onclick="javascript:getDetailView('304119');return false;">
+                2025년 전세형 매입임대주택 입주자 모집공고(2025.12.26.) 예비1차 당첨자 명단 및 계약안내
+              </a>
+            </td>
+            <td>Rental Team</td>
+            <td class="num">2026-05-08</td>
+            <td class="num">100</td>
+          </tr>
+          <tr>
+            <td>1611</td>
+            <td class="txtL">
+              <a href="#" class="ellipsis" onclick="javascript:getDetailView('304120');return false;">
+                제7차 장기전세주택2(미리내집) 입주자 모집공고(2026. 4. 24.) 최종 청약접수 결과 안내
+              </a>
+            </td>
+            <td>Rental Team</td>
+            <td class="num">2026-05-08</td>
+            <td class="num">100</td>
+          </tr>
+          <tr>
+            <td>1612</td>
+            <td class="txtL">
+              <a href="#" class="ellipsis" onclick="javascript:getDetailView('304121');return false;">
+                [서울지역본부] 집주인 임대주택 예비입주자 모집공고(건설개량형)
+              </a>
+            </td>
+            <td>Rental Team</td>
+            <td class="num">2026-05-07</td>
+            <td class="num">100</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+        const notices = parseShNoticeListHtml(html);
+        expect(notices).toHaveLength(1);
+        expect(notices[0]?.sourceId).toBe('304121');
+        expect(notices[0]?.title).toContain('예비입주자 모집공고');
+    });
     it('fetches live SH notice HTML with an injected fetch implementation', async () => {
         const html = `
       <table>
@@ -483,7 +539,7 @@ describe('adapter contract', () => {
             <td>1608</td>
             <td class="txtL">
               <a href="#" class="ellipsis" onclick="javascript:getDetailView('304117');return false;">
-                2026 SH youth rental notice
+                2026 SH youth rental 모집공고
               </a>
             </td>
             <td>Youth Housing Team</td>
@@ -513,7 +569,7 @@ describe('adapter contract', () => {
         expect(notices).toEqual([
             {
                 sourceId: '304117',
-                title: '2026 SH youth rental notice',
+                title: '2026 SH youth rental 모집공고',
                 status: 'posted',
                 region: '서울',
                 postedAt: '2026-05-09',
@@ -527,7 +583,7 @@ describe('adapter contract', () => {
                 },
                 listings: [
                     {
-                        title: '2026 SH youth rental notice',
+                        title: '2026 SH youth rental 모집공고',
                         supplyType: 'Youth Housing Team',
                         region: '서울',
                         status: 'posted',

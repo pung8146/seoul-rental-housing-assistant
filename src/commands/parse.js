@@ -39,7 +39,7 @@ const parseStructuredFilters = (input) => {
 };
 export const parseCommand = (input) => {
     const normalized = normalizeWhitespace(input);
-    const detailMatch = normalized.match(/^(\d+)번\s+자세히$/);
+    const detailMatch = normalized.match(/^(\d+)번(?:\s+자세히)?$/);
     if (detailMatch) {
         return { intent: 'detail', index: Number(detailMatch[1]) };
     }
