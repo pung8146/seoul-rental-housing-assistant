@@ -212,6 +212,62 @@ describe('sqlite repository', () => {
             changeHash: secondRun.events[0]?.listing?.changeHash,
         });
     });
+    it('prefers adapter detail output when a notice has detailed listings', async () => {
+        const repository = createRepository(':memory:');
+        const adapter = {
+            source: 'lh',
+            async fetchNotices() {
+                return [
+                    {
+                        sourceId: 'notice-1',
+                        title: '서울 청년 임대주택 모집',
+                        region: '서울',
+                        targetTags: ['청년'],
+                        postedAt: '2026-05-07',
+                        sourceUrl: 'https://example.com/notices/1',
+                        listings: [
+                            {
+                                title: '목록 placeholder',
+                                supplyType: '행복주택',
+                                region: '서울',
+                                status: '공급중',
+                            },
+                        ],
+                    },
+                ];
+            },
+            async fetchNoticeDetails(id) {
+                return {
+                    sourceId: id,
+                    title: '서울 청년 임대주택 모집',
+                    region: '서울',
+                    targetTags: ['청년'],
+                    postedAt: '2026-05-07',
+                    sourceUrl: 'https://example.com/notices/1',
+                    listings: [
+                        {
+                            title: '101동 201호',
+                            supplyType: '행복주택',
+                            region: '서울',
+                            deposit: '10,000,000',
+                            monthlyRent: '250,000',
+                            floorAreaM2: '39.8',
+                            status: '공급중',
+                        },
+                    ],
+                };
+            },
+        };
+        await runCollect({ repository, adapters: [adapter] });
+        expect(repository.queryListingsByNotice('lh', 'notice-1')).toMatchObject([
+            expect.objectContaining({
+                title: '101동 201호',
+                deposit: 10000000,
+                monthlyRent: 250000,
+                floorAreaM2: 39.8,
+            }),
+        ]);
+    });
     it('collects live LH adapter notices without missing downstream-required fields', async () => {
         const repository = createRepository(':memory:');
         const html = `

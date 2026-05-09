@@ -1,4 +1,5 @@
 import type { SourceAdapter } from '../adapters/base.js';
+import type { RawNoticeCandidate } from '../adapters/base.js';
 import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
 import { createRepository, type Repository } from '../db/repository.js';
@@ -35,6 +36,23 @@ export const createDefaultAdapters = (): SourceAdapter[] => [createLhAdapter(), 
 export const formatCollectResult = (result: RunCollectResult): string =>
   formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 
+const hydrateNoticeDetails = async (
+  adapter: SourceAdapter,
+  rawNotices: RawNoticeCandidate[],
+): Promise<RawNoticeCandidate[]> => {
+  if (!adapter.fetchNoticeDetails) {
+    return rawNotices;
+  }
+
+  const hydrated: RawNoticeCandidate[] = [];
+  for (const rawNotice of rawNotices) {
+    const detailedNotice = await adapter.fetchNoticeDetails(rawNotice.sourceId);
+    hydrated.push(detailedNotice ?? rawNotice);
+  }
+
+  return hydrated;
+};
+
 export const runCollect = async ({ adapters, repository }: RunCollectInput): Promise<RunCollectResult> => {
   const events: NotificationEvent[] = [];
   const failures: CollectFailure[] = [];
@@ -44,7 +62,8 @@ export const runCollect = async ({ adapters, repository }: RunCollectInput): Pro
 
     try {
       const rawNotices = await adapter.fetchNotices();
-      const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: rawNotices });
+      const detailedNotices = await hydrateNoticeDetails(adapter, rawNotices);
+      const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
 
       for (const notice of notices) {
         const incomingListings = listings.filter(

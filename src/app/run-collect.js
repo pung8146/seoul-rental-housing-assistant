@@ -12,6 +12,17 @@ const toMessage = (error) => {
 };
 export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
 export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
+const hydrateNoticeDetails = async (adapter, rawNotices) => {
+    if (!adapter.fetchNoticeDetails) {
+        return rawNotices;
+    }
+    const hydrated = [];
+    for (const rawNotice of rawNotices) {
+        const detailedNotice = await adapter.fetchNoticeDetails(rawNotice.sourceId);
+        hydrated.push(detailedNotice ?? rawNotice);
+    }
+    return hydrated;
+};
 export const runCollect = async ({ adapters, repository }) => {
     const events = [];
     const failures = [];
@@ -19,7 +30,8 @@ export const runCollect = async ({ adapters, repository }) => {
         const startedAt = new Date().toISOString();
         try {
             const rawNotices = await adapter.fetchNotices();
-            const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: rawNotices });
+            const detailedNotices = await hydrateNoticeDetails(adapter, rawNotices);
+            const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
             for (const notice of notices) {
                 const incomingListings = listings.filter((listing) => listing.source === notice.source && listing.noticeSourceId === notice.sourceId);
                 const existingNotice = repository.findNoticeBySourceId(notice.source, notice.sourceId);
