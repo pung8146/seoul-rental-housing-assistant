@@ -1,4 +1,6 @@
 import type { SourceAdapter } from '../adapters/base.js';
+import { createLhAdapter } from '../adapters/lh.js';
+import { createShAdapter } from '../adapters/sh.js';
 import { createRepository, type Repository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { normalizeAdapterOutput } from '../domain/normalize.js';
@@ -26,6 +28,8 @@ const toMessage = (error: unknown): string => {
 
   return 'unknown error';
 };
+
+export const createDefaultAdapters = (): SourceAdapter[] => [createLhAdapter(), createShAdapter()];
 
 export const runCollect = async ({ adapters, repository }: RunCollectInput): Promise<RunCollectResult> => {
   const events: NotificationEvent[] = [];
@@ -91,7 +95,7 @@ const main = async () => {
   const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
 
   try {
-    const result = await runCollect({ adapters: [], repository });
+    const result = await runCollect({ adapters: createDefaultAdapters(), repository });
     console.log(JSON.stringify(result, null, 2));
   } finally {
     repository.close();

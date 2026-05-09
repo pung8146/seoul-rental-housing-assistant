@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLhAdapter } from '../src/adapters/lh.js';
 import { createRepository } from '../src/db/repository.js';
-import { runCollect } from '../src/app/run-collect.js';
+import { createDefaultAdapters, runCollect } from '../src/app/run-collect.js';
 const makeNotice = (overrides = {}) => ({
     source: 'lh',
     sourceId: 'notice-1',
@@ -35,6 +35,9 @@ const makeListing = (overrides = {}) => ({
     ...overrides,
 });
 describe('sqlite repository', () => {
+    it('uses LH and SH as the default collection adapters', () => {
+        expect(createDefaultAdapters().map((adapter) => adapter.source)).toEqual(['lh', 'sh']);
+    });
     it('initializes schema successfully', () => {
         const repository = createRepository(':memory:');
         expect(repository.queryNotices({})).toEqual([]);

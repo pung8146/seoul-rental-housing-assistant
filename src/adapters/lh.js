@@ -39,7 +39,9 @@ export const parseLhNoticeListHtml = (html) => {
         }
         const postedAtIndex = cells.findIndex((cell, index) => index > titleCellIndex && isDateCell(cell));
         const supplyType = titleCellIndex > 1 ? cells[titleCellIndex - 1] : cells[titleCellIndex + 1] ?? '';
-        const region = postedAtIndex > titleCellIndex ? cells.slice(titleCellIndex + 1, postedAtIndex).filter(Boolean).at(-1) ?? '' : '';
+        const regionStartIndex = titleCellIndex > 1 ? titleCellIndex + 1 : titleCellIndex + 2;
+        const regionCandidates = postedAtIndex > titleCellIndex ? cells.slice(regionStartIndex, postedAtIndex).filter(Boolean) : [];
+        const region = regionCandidates.find((cell) => !cell.includes('첨부')) ?? regionCandidates.at(-1) ?? '';
         const postedAt = normalizeLhDate(cells[postedAtIndex] ?? '');
         const applicationEndAt = normalizeLhDate(cells.find((cell, index) => index > postedAtIndex && isDateCell(cell)) ?? '');
         const status = cells[postedAtIndex + 2] ?? cells[postedAtIndex + 1] ?? '';

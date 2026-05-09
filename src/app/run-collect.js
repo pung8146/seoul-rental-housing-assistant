@@ -1,3 +1,5 @@
+import { createLhAdapter } from '../adapters/lh.js';
+import { createShAdapter } from '../adapters/sh.js';
 import { createRepository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { normalizeAdapterOutput } from '../domain/normalize.js';
@@ -7,6 +9,7 @@ const toMessage = (error) => {
     }
     return 'unknown error';
 };
+export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
 export const runCollect = async ({ adapters, repository }) => {
     const events = [];
     const failures = [];
@@ -61,7 +64,7 @@ export const runCollect = async ({ adapters, repository }) => {
 const main = async () => {
     const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
     try {
-        const result = await runCollect({ adapters: [], repository });
+        const result = await runCollect({ adapters: createDefaultAdapters(), repository });
         console.log(JSON.stringify(result, null, 2));
     }
     finally {

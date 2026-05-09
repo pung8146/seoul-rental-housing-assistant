@@ -72,7 +72,40 @@ describe('core domain schemas', () => {
 });
 describe('adapter contract', () => {
     it('returns raw notice and listing candidate records in a shared shape for each adapter', async () => {
-        const adapters = [createLhAdapter(), createShAdapter()];
+        const adapters = [
+            createLhAdapter({
+                fetch: async () => new Response(`
+            <table>
+              <tr>
+                <td>1</td>
+                <td>
+                  <button class="wrtancInfoBtn" data-id1="lh-contract" data-id2="01">LH contract notice</button>
+                </td>
+                <td>매입임대</td>
+                <td>서울특별시</td>
+                <td>2026.05.07</td>
+                <td>2026.05.20</td>
+                <td>접수중</td>
+              </tr>
+            </table>
+          `),
+            }),
+            createShAdapter({
+                fetch: async () => new Response(`
+            <table>
+              <tr>
+                <td>1</td>
+                <td class="txtL">
+                  <a href="#" onclick="javascript:getDetailView('sh-contract');return false;">SH contract notice</a>
+                </td>
+                <td>Rental Team</td>
+                <td>2026-05-08</td>
+                <td>10</td>
+              </tr>
+            </table>
+          `),
+            }),
+        ];
         for (const adapter of adapters) {
             const notices = await adapter.fetchNotices();
             expect(Array.isArray(notices)).toBe(true);
@@ -211,6 +244,63 @@ describe('adapter contract', () => {
                             rawIds: {
                                 dataId1: '67890',
                                 dataId2: 'B2',
+                            },
+                        },
+                    },
+                ],
+            },
+        ]);
+    });
+    it('parses current LH list rows without treating attachment text as region', () => {
+        const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>국민임대</td>
+            <td>
+              <a href="javascript:" data-id1="2015122300019915" data-id2="03" data-id3="06" data-id4="07" class="wrtancInfoBtn">
+                <span>김제하동 국민임대주택 모집공고 <em class="day">1일전</em></span>
+              </a>
+            </td>
+            <td>전북</td>
+            <td>첨부파일 있음</td>
+            <td>2026.05.08</td>
+            <td>2026.05.21</td>
+            <td class="mVw stt noti">공고중</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+        expect(parseLhNoticeListHtml(html)).toEqual([
+            {
+                sourceId: '2015122300019915',
+                title: '김제하동 국민임대주택 모집공고 1일전',
+                status: '공고중',
+                region: '전북',
+                postedAt: '2026-05-08',
+                applicationEndAt: '2026-05-21',
+                metadata: {
+                    provider: 'LH',
+                    rawIds: {
+                        dataId1: '2015122300019915',
+                        dataId2: '03',
+                        dataId3: '06',
+                        dataId4: '07',
+                    },
+                },
+                listings: [
+                    {
+                        title: '김제하동 국민임대주택 모집공고 1일전',
+                        supplyType: '국민임대',
+                        region: '전북',
+                        status: '공고중',
+                        metadata: {
+                            rawIds: {
+                                dataId1: '2015122300019915',
+                                dataId2: '03',
+                                dataId3: '06',
+                                dataId4: '07',
                             },
                         },
                     },
