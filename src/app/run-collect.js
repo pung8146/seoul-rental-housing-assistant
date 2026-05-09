@@ -3,6 +3,7 @@ import { createShAdapter } from '../adapters/sh.js';
 import { createRepository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { normalizeAdapterOutput } from '../domain/normalize.js';
+import { formatDailySummary } from '../notifier/formatter.js';
 const toMessage = (error) => {
     if (error instanceof Error) {
         return error.message;
@@ -10,6 +11,7 @@ const toMessage = (error) => {
     return 'unknown error';
 };
 export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
+export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures);
 export const runCollect = async ({ adapters, repository }) => {
     const events = [];
     const failures = [];
@@ -65,7 +67,12 @@ const main = async () => {
     const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
     try {
         const result = await runCollect({ adapters: createDefaultAdapters(), repository });
-        console.log(JSON.stringify(result, null, 2));
+        if (process.argv.includes('--json')) {
+            console.log(JSON.stringify(result, null, 2));
+        }
+        else {
+            console.log(formatCollectResult(result));
+        }
     }
     finally {
         repository.close();

@@ -4,6 +4,7 @@ import { createShAdapter } from '../adapters/sh.js';
 import { createRepository, type Repository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { normalizeAdapterOutput } from '../domain/normalize.js';
+import { formatDailySummary } from '../notifier/formatter.js';
 import type { NotificationEvent } from '../types.js';
 
 export type CollectFailure = {
@@ -30,6 +31,9 @@ const toMessage = (error: unknown): string => {
 };
 
 export const createDefaultAdapters = (): SourceAdapter[] => [createLhAdapter(), createShAdapter()];
+
+export const formatCollectResult = (result: RunCollectResult): string =>
+  formatDailySummary(result.events, result.failures);
 
 export const runCollect = async ({ adapters, repository }: RunCollectInput): Promise<RunCollectResult> => {
   const events: NotificationEvent[] = [];
@@ -96,7 +100,11 @@ const main = async () => {
 
   try {
     const result = await runCollect({ adapters: createDefaultAdapters(), repository });
-    console.log(JSON.stringify(result, null, 2));
+    if (process.argv.includes('--json')) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(formatCollectResult(result));
+    }
   } finally {
     repository.close();
   }

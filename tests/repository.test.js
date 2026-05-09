@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLhAdapter } from '../src/adapters/lh.js';
 import { createRepository } from '../src/db/repository.js';
-import { createDefaultAdapters, runCollect } from '../src/app/run-collect.js';
+import { createDefaultAdapters, formatCollectResult, runCollect } from '../src/app/run-collect.js';
 const makeNotice = (overrides = {}) => ({
     source: 'lh',
     sourceId: 'notice-1',
@@ -37,6 +37,25 @@ const makeListing = (overrides = {}) => ({
 describe('sqlite repository', () => {
     it('uses LH and SH as the default collection adapters', () => {
         expect(createDefaultAdapters().map((adapter) => adapter.source)).toEqual(['lh', 'sh']);
+    });
+    it('formats collection results as a Telegram-ready summary', () => {
+        const notice = makeNotice();
+        const text = formatCollectResult({
+            events: [
+                {
+                    type: 'new_notice',
+                    notice,
+                    listing: null,
+                    previousNotice: null,
+                    previousListing: null,
+                    occurredAt: '2026-05-07T09:00:00.000Z',
+                },
+            ],
+            failures: [],
+        });
+        expect(text).toContain('신규');
+        expect(text).toContain('서울 청년 임대주택 모집');
+        expect(text).toContain('https://example.com/notices/1');
     });
     it('initializes schema successfully', () => {
         const repository = createRepository(':memory:');
