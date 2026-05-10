@@ -171,6 +171,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('수집 상태');
     expect(html).toContain('<strong>1</strong><span>수집 주의</span>');
     expect(html).toContain('<strong>2026-05-09 19:00</strong><span>마지막 수집</span>');
+    expect(html).toContain('<span class="collection-freshness stale">오래됨</span>');
     expect(html).toContain('수집 확인 필요: SH 최근 실패');
     expect(html).toContain('기관별 수집 상태');
     expect(html).toContain('최근 성공');
@@ -321,5 +322,17 @@ describe('renderDashboardHtml', () => {
     });
 
     expect(html).not.toContain('수집 확인 필요:');
+  });
+
+  it('marks recent collection as fresh', () => {
+    const html = renderDashboardHtml({
+      ...view,
+      stats: {
+        ...view.stats,
+        lastCollectedAt: new Date().toISOString(),
+      },
+    });
+
+    expect(html).toContain('<span class="collection-freshness fresh">최신</span>');
   });
 });

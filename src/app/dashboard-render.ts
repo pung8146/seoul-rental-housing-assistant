@@ -48,6 +48,24 @@ const formatKoreaDateTime = (value: string | null): string => {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 };
 
+const getCollectionFreshness = (value: string | null): { className: 'fresh' | 'stale' | 'unknown'; label: string } => {
+  if (!value) {
+    return { className: 'unknown', label: '기록 없음' };
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { className: 'unknown', label: '확인필요' };
+  }
+
+  const dayInMilliseconds = 24 * 60 * 60 * 1000;
+  if (Date.now() - date.getTime() > dayInMilliseconds) {
+    return { className: 'stale', label: '오래됨' };
+  }
+
+  return { className: 'fresh', label: '최신' };
+};
+
 const formatInputValue = (value: string | number | null): string => (value === null ? '' : String(value));
 
 const getKoreaToday = (): string => {
@@ -282,6 +300,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
   const selectedKey = view.selectedNotice?.notice.noticeKey;
   const selectedNotice = view.selectedNotice?.notice;
   const attachments = selectedNotice ? getAttachments(selectedNotice) : [];
+  const collectionFreshness = getCollectionFreshness(view.stats.lastCollectedAt);
 
   return `<!doctype html>
 <html lang="ko">
@@ -355,6 +374,30 @@ export const renderDashboardHtml = (view: DashboardView): string => {
     .stat strong { display: block; font-size: 24px; margin-bottom: 4px; }
     .stat.timestamp strong { font-size: 16px; line-height: 1.25; }
     .stat span, .notice-meta, .muted { color: var(--muted); }
+    .collection-freshness {
+      display: inline-flex;
+      width: fit-content;
+      margin-top: 6px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .collection-freshness.fresh {
+      color: #166534;
+      background: #dcfce7;
+      border: 1px solid #86efac;
+    }
+    .collection-freshness.stale {
+      color: #991b1b;
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+    }
+    .collection-freshness.unknown {
+      color: #475569;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+    }
     .source-issue-summary {
       margin: 0 16px 16px;
       border: 1px solid #fde68a;
@@ -711,7 +754,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
           <div class="stat"><strong>${view.stats.excludedCount}</strong><span>제외됨</span></div>
           <div class="stat"><strong>${view.stats.sourceRunCount}</strong><span>수집 기록</span></div>
           <div class="stat"><strong>${view.stats.sourceIssueCount}</strong><span>수집 주의</span></div>
-          <div class="stat timestamp"><strong>${escapeHtml(formatKoreaDateTime(view.stats.lastCollectedAt))}</strong><span>마지막 수집</span></div>
+          <div class="stat timestamp"><strong>${escapeHtml(formatKoreaDateTime(view.stats.lastCollectedAt))}</strong><span>마지막 수집</span><span class="collection-freshness ${collectionFreshness.className}">${collectionFreshness.label}</span></div>
         </div>
         ${renderSourceIssueSummary(view)}
       </section>
