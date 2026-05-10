@@ -146,4 +146,50 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('서울가좌 행복주택 예비입주자 모집공고(2026.05.07) 16형 대학생');
     expect(html).not.toContain('1일전');
   });
+
+  it('uses precise application status badges instead of generic progress labels', () => {
+    const html = renderDashboardHtml({
+      ...view,
+      actionableNotices: [
+        {
+          ...view.actionableNotices[0]!,
+          title: '신청 가능한 공고 입주자 모집공고',
+          applicationStartAt: '2020-01-01',
+          applicationEndAt: '2999-01-01',
+        },
+        {
+          ...view.actionableNotices[0]!,
+          sourceId: 'notice-2',
+          noticeKey: 'lh:notice-2',
+          title: '접수 예정 공고 입주자 모집공고',
+          applicationStartAt: '2999-01-01',
+          applicationEndAt: '2999-02-01',
+        },
+        {
+          ...view.actionableNotices[0]!,
+          sourceId: 'notice-3',
+          noticeKey: 'lh:notice-3',
+          title: '날짜 부족 공고 입주자 모집공고',
+          status: '공고중',
+          applicationStartAt: null,
+          applicationEndAt: null,
+        },
+        {
+          ...view.actionableNotices[0]!,
+          sourceId: 'notice-4',
+          noticeKey: 'lh:notice-4',
+          title: '확인 필요한 공고 입주자 모집공고',
+          status: null,
+          applicationStartAt: null,
+          applicationEndAt: null,
+        },
+      ],
+    });
+
+    expect(html).toContain('<span class="status-badge available">신청가능</span>');
+    expect(html).toContain('<span class="status-badge upcoming">접수예정</span>');
+    expect(html).toContain('<span class="status-badge posted">공고중</span>');
+    expect(html).toContain('<span class="status-badge unknown">확인필요</span>');
+    expect(html).not.toContain('>진행</span>');
+  });
 });

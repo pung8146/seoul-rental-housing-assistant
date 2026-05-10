@@ -34,18 +34,48 @@ const getKoreaToday = (): string => {
 
 const cleanRelativeAge = (title: string): string => title.replace(/\s*\d+일전/g, '').replace(/\s+/g, ' ').trim();
 
-const isClosedNotice = (notice: Pick<Notice, 'applicationEndAt' | 'status'>): boolean => {
-  if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
-    return true;
-  }
-
-  return Boolean(notice.applicationEndAt && notice.applicationEndAt < getKoreaToday());
+type ApplicationStatus = {
+  className: 'available' | 'upcoming' | 'posted' | 'closed' | 'unknown';
+  label: '신청가능' | '접수예정' | '공고중' | '마감' | '확인필요';
 };
 
-const renderStatusBadge = (notice: Pick<Notice, 'applicationEndAt' | 'status'>): string =>
-  isClosedNotice(notice)
-    ? '<span class="status-badge closed">마감</span>'
-    : '<span class="status-badge open">진행</span>';
+const getApplicationStatus = (
+  notice: Pick<Notice, 'applicationStartAt' | 'applicationEndAt' | 'status'>,
+): ApplicationStatus => {
+  if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
+    return { className: 'closed', label: '마감' };
+  }
+
+  const today = getKoreaToday();
+
+  if (notice.applicationEndAt && notice.applicationEndAt < today) {
+    return { className: 'closed', label: '마감' };
+  }
+
+  if (notice.applicationStartAt && notice.applicationStartAt > today) {
+    return { className: 'upcoming', label: '접수예정' };
+  }
+
+  if (
+    notice.applicationStartAt &&
+    notice.applicationStartAt <= today &&
+    notice.applicationEndAt &&
+    notice.applicationEndAt >= today
+  ) {
+    return { className: 'available', label: '신청가능' };
+  }
+
+  if (notice.status && /(공고중|정정공고중|게시|posted)/i.test(notice.status)) {
+    return { className: 'posted', label: '공고중' };
+  }
+
+  return { className: 'unknown', label: '확인필요' };
+};
+
+const renderStatusBadge = (notice: Pick<Notice, 'applicationStartAt' | 'applicationEndAt' | 'status'>): string => {
+  const status = getApplicationStatus(notice);
+  return `<span class="status-badge ${status.className}">${status.label}</span>`;
+};
 
 const reasonLabel = (notice: ExcludedDashboardNotice): string => {
   if (notice.exclusionReason === 'service_notice') {
@@ -188,15 +218,30 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       font-size: 12px;
       font-weight: 700;
     }
-    .status-badge.open {
+    .status-badge.available {
       color: #166534;
       background: #dcfce7;
       border: 1px solid #86efac;
+    }
+    .status-badge.upcoming {
+      color: #854d0e;
+      background: #fef9c3;
+      border: 1px solid #fde047;
+    }
+    .status-badge.posted {
+      color: #1e40af;
+      background: #dbeafe;
+      border: 1px solid #93c5fd;
     }
     .status-badge.closed {
       color: #991b1b;
       background: #fee2e2;
       border: 1px solid #fecaca;
+    }
+    .status-badge.unknown {
+      color: #475569;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
     }
     .notice-list { display: grid; }
     .notice-row {
