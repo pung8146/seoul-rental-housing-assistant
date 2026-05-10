@@ -30,6 +30,8 @@ const stripHtml = (html: string): string =>
 
 const decodeHtmlEntities = (value: string): string => value.replace(/&amp;/gi, '&');
 
+const normalizeShDate = (value: string): string => value.replace(/\./g, '-');
+
 const extractTitle = (rowHtml: string): string => {
   const anchorMatch = rowHtml.match(/<a\b[^>]*onclick=["'][^"']*getDetailView\(['"][^'"]+['"]\)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
   return anchorMatch?.[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
@@ -119,8 +121,24 @@ const extractAttachments = (html: string): Array<{ title: string; url: string }>
   return attachments;
 };
 
+const extractApplicationPeriod = (html: string): { applicationStartAt?: string; applicationEndAt?: string } => {
+  const text = stripHtml(html);
+  const match = text.match(
+    /(?:신청접수기간|신청기간|접수기간)\s*:?\s*(\d{4}[-.]\d{2}[-.]\d{2})\s*~\s*(\d{4}[-.]\d{2}[-.]\d{2})/,
+  );
+  if (!match) {
+    return {};
+  }
+
+  return {
+    applicationStartAt: normalizeShDate(match[1] ?? ''),
+    applicationEndAt: normalizeShDate(match[2] ?? ''),
+  };
+};
+
 export const parseShNoticeDetailHtml = (html: string, notice: RawNoticeCandidate): RawNoticeCandidate => {
   const attachments = extractAttachments(html);
+  const applicationPeriod = extractApplicationPeriod(html);
   const primaryApplicationAttachment = findPrimaryApplicationAttachment(attachments);
   const bodyPreview = stripHtml(
     html
@@ -131,6 +149,7 @@ export const parseShNoticeDetailHtml = (html: string, notice: RawNoticeCandidate
 
   return {
     ...notice,
+    ...applicationPeriod,
     metadata: {
       ...(notice.metadata ?? {}),
       attachments,

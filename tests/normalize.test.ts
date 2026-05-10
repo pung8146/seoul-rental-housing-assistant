@@ -890,6 +890,39 @@ describe('adapter contract', () => {
     });
   });
 
+  it('extracts SH detail application periods for dashboard availability status', () => {
+    const notice = {
+      sourceId: '304122',
+      title: '청년안심주택 입주자 모집공고',
+      status: 'posted',
+      region: '서울',
+      postedAt: '2026-05-08',
+      sourceUrl: 'https://www.i-sh.co.kr/main/view.do?seq=304122',
+      metadata: {
+        provider: 'SH',
+        rawIds: { seq: '304122' },
+      },
+      listings: [
+        {
+          title: '청년안심주택 입주자 모집공고',
+          region: '서울',
+          status: 'posted',
+        },
+      ],
+    };
+    const html = `
+      <section>
+        <h3>공급일정</h3>
+        <p>신청접수기간 : 2026.05.15 ~ 2026.05.21</p>
+      </section>
+    `;
+
+    expect(parseShNoticeDetailHtml(html, notice)).toMatchObject({
+      applicationStartAt: '2026-05-15',
+      applicationEndAt: '2026-05-21',
+    });
+  });
+
   it('marks SH application notice attachments for manual requirement review', () => {
     const notice = {
       sourceId: '304121',

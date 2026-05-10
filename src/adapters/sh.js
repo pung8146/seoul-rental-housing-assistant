@@ -16,6 +16,7 @@ const stripHtml = (html) => html
     .replace(/\s+/g, ' ')
     .trim();
 const decodeHtmlEntities = (value) => value.replace(/&amp;/gi, '&');
+const normalizeShDate = (value) => value.replace(/\./g, '-');
 const extractTitle = (rowHtml) => {
     const anchorMatch = rowHtml.match(/<a\b[^>]*onclick=["'][^"']*getDetailView\(['"][^'"]+['"]\)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
     return anchorMatch?.[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
@@ -88,8 +89,20 @@ const extractAttachments = (html) => {
     }
     return attachments;
 };
+const extractApplicationPeriod = (html) => {
+    const text = stripHtml(html);
+    const match = text.match(/(?:신청접수기간|신청기간|접수기간)\s*:?\s*(\d{4}[-.]\d{2}[-.]\d{2})\s*~\s*(\d{4}[-.]\d{2}[-.]\d{2})/);
+    if (!match) {
+        return {};
+    }
+    return {
+        applicationStartAt: normalizeShDate(match[1] ?? ''),
+        applicationEndAt: normalizeShDate(match[2] ?? ''),
+    };
+};
 export const parseShNoticeDetailHtml = (html, notice) => {
     const attachments = extractAttachments(html);
+    const applicationPeriod = extractApplicationPeriod(html);
     const primaryApplicationAttachment = findPrimaryApplicationAttachment(attachments);
     const bodyPreview = stripHtml(html
         .replace(/<a\b[^>]*href=["']#["'][^>]*>\s*\.[a-z0-9]+\s*<\/a>/gi, ' ')
@@ -97,6 +110,7 @@ export const parseShNoticeDetailHtml = (html, notice) => {
     const eligibilityRequirements = extractEligibilityRequirementsFromText(stripHtml(html));
     return {
         ...notice,
+        ...applicationPeriod,
         metadata: {
             ...(notice.metadata ?? {}),
             attachments,
