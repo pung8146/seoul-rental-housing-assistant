@@ -77,8 +77,8 @@ describe('runAssistantText', () => {
             input: '서울만 보여줘',
         });
         expect(result.mode).toBe('query');
-        expect(result.text).toContain('1. 서울 청년 임대주택 2');
-        expect(result.text).toContain('2. 서울 청년 임대주택 1');
+        expect(result.text).toContain('1. [프로필 필요] 서울 청년 임대주택 2');
+        expect(result.text).toContain('2. [프로필 필요] 서울 청년 임대주택 1');
     });
     it('collects before answering a list query when the database is empty', async () => {
         const repository = createRepository(':memory:');
@@ -106,7 +106,7 @@ describe('runAssistantText', () => {
             input: '서울만 보여줘',
         });
         expect(result.mode).toBe('query');
-        expect(result.text).toContain('1. 서울 청년 임대주택 1');
+        expect(result.text).toContain('1. [프로필 필요] 서울 청년 임대주택 1');
     });
     it('carries the shown list forward for follow-up detail questions', async () => {
         const repository = createRepository(':memory:');
@@ -131,8 +131,8 @@ describe('runAssistantText', () => {
             input: '2번 자세히',
             context,
         });
-        expect(listResult.text).toContain('1. 서울 청년 임대주택 3');
-        expect(listResult.text).toContain('2. 서울 청년 임대주택 1');
+        expect(listResult.text).toContain('1. [프로필 필요] 서울 청년 임대주택 3');
+        expect(listResult.text).toContain('2. [프로필 필요] 서울 청년 임대주택 1');
         expect(detailResult.text).toContain('서울 청년 임대주택 1');
         expect(detailResult.text).toContain('서울 1번 상세');
         expect(detailResult.text).not.toContain('경기 상세');

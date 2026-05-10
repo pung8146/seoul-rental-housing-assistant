@@ -51,8 +51,8 @@ describe('runQuery', () => {
             },
         });
         expect(result.lines).toHaveLength(5);
-        expect(result.lines[0]).toContain('1. 공고 6 입주자 모집공고');
-        expect(result.lines[4]).toContain('5. 공고 2 입주자 모집공고');
+        expect(result.lines[0]).toContain('1. [프로필 필요] 공고 6 입주자 모집공고');
+        expect(result.lines[4]).toContain('5. [프로필 필요] 공고 2 입주자 모집공고');
         expect(result.text).not.toContain('공고 1');
     });
     it('hides non-application announcements from list results', () => {
@@ -124,6 +124,53 @@ describe('runQuery', () => {
         expect(result.text).toBe('조건에 맞는 공고 없음');
         expect(result.lines).toEqual(['조건에 맞는 공고 없음']);
     });
+    it('summarizes and sorts list results by safe eligibility assessment', () => {
+        const repository = createRepository(':memory:');
+        const reviewNotice = makeNotice(1, {
+            title: '서울 청년 조건 미확인 입주자 모집공고',
+            region: '서울',
+            postedAt: '2026-05-09',
+        });
+        const likelyNotice = makeNotice(2, {
+            title: '서울 청년 조건 확인 입주자 모집공고',
+            region: '서울',
+            postedAt: '2026-05-01',
+            metadata: {
+                eligibilityRequirements: {
+                    minAge: 19,
+                    maxAge: 39,
+                    requiresHomeless: true,
+                    maxMonthlyIncome: 3589957,
+                    maxTotalAssets: 345000000,
+                    maxVehicleValue: 37080000,
+                },
+            },
+        });
+        repository.upsertNotice(reviewNotice);
+        repository.upsertNotice(likelyNotice);
+        repository.savePersonalProfile({
+            birthYear: 1995,
+            isHomeless: true,
+            residenceRegion: '서울',
+            householdSize: 1,
+            monthlyIncome: 2500000,
+            totalAssets: 50000000,
+            vehicleValue: 0,
+            interestTags: ['청년'],
+        });
+        const result = runQuery({
+            repository,
+            command: {
+                intent: 'list',
+                filters: { region: '서울' },
+            },
+        });
+        expect(result.text).toContain('신청 가능성 높은 공고 1건');
+        expect(result.text).toContain('확인 필요 1건');
+        expect(result.lines[0]).toContain('1. [지원가능성 높음] 서울 청년 조건 확인 입주자 모집공고');
+        expect(result.lines[1]).toContain('2. [조건 확인 필요] 서울 청년 조건 미확인 입주자 모집공고');
+        expect(result.lines[1]).toContain('공고문에서 신청 조건을 찾지 못함');
+    });
     it('returns listing rows for detail intent', () => {
         const repository = createRepository(':memory:');
         const notices = [
@@ -172,8 +219,8 @@ describe('runQuery', () => {
             previousNotices: listResult.notices,
         });
         expect(listResult.lines).toEqual([
-            expect.stringContaining('1. 공고 3 입주자 모집공고'),
-            expect.stringContaining('2. 공고 1 입주자 모집공고'),
+            expect.stringContaining('1. [프로필 필요] 공고 3 입주자 모집공고'),
+            expect.stringContaining('2. [프로필 필요] 공고 1 입주자 모집공고'),
         ]);
         expect(detailResult.text).toContain('공고 1 입주자 모집공고');
         expect(detailResult.text).toContain('서울 상세 매물');

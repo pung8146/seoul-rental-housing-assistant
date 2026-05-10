@@ -1,8 +1,11 @@
 import type { Listing, NotificationEvent, Notice } from '../types.js';
+import type { EligibilityAssessment } from '../domain/eligibility.js';
 
-export const formatNoticeSummaryLine = (notice: Notice, index: number): string => {
+export const formatNoticeSummaryLine = (notice: Notice, index: number, eligibility?: EligibilityAssessment): string => {
   const details = [notice.region, notice.status].filter((value): value is string => Boolean(value)).join(' · ');
-  return `${index}. ${notice.title}${details ? ` (${details})` : ''}`;
+  const prefix = eligibility ? `[${eligibility.label}] ` : '';
+  const reasons = eligibility?.reasons.length ? ` - ${eligibility.reasons.join(', ')}` : '';
+  return `${index}. ${prefix}${notice.title}${details ? ` (${details})` : ''}${reasons}`;
 };
 
 type Failure = {
@@ -82,8 +85,19 @@ export const formatDailySummary = (
   return lines.join('\n\n');
 };
 
-export const formatNoticeDetails = (notice: Notice, listings: Listing[]): string => {
+export const formatNoticeDetails = (
+  notice: Notice,
+  listings: Listing[],
+  eligibility?: EligibilityAssessment,
+): string => {
   const lines = [notice.title];
+
+  if (eligibility) {
+    lines.push(`지원가능성: ${eligibility.label}`);
+    if (eligibility.reasons.length > 0) {
+      lines.push(`판정 근거: ${eligibility.reasons.join(', ')}`);
+    }
+  }
 
   if (notice.sourceUrl) {
     lines.push(notice.sourceUrl);

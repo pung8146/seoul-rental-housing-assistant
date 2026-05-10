@@ -1,6 +1,8 @@
-export const formatNoticeSummaryLine = (notice, index) => {
+export const formatNoticeSummaryLine = (notice, index, eligibility) => {
     const details = [notice.region, notice.status].filter((value) => Boolean(value)).join(' · ');
-    return `${index}. ${notice.title}${details ? ` (${details})` : ''}`;
+    const prefix = eligibility ? `[${eligibility.label}] ` : '';
+    const reasons = eligibility?.reasons.length ? ` - ${eligibility.reasons.join(', ')}` : '';
+    return `${index}. ${prefix}${notice.title}${details ? ` (${details})` : ''}${reasons}`;
 };
 const formatCurrency = (value) => {
     if (value === null) {
@@ -47,8 +49,14 @@ export const formatDailySummary = (events, failures = []) => {
     }
     return lines.join('\n\n');
 };
-export const formatNoticeDetails = (notice, listings) => {
+export const formatNoticeDetails = (notice, listings, eligibility) => {
     const lines = [notice.title];
+    if (eligibility) {
+        lines.push(`지원가능성: ${eligibility.label}`);
+        if (eligibility.reasons.length > 0) {
+            lines.push(`판정 근거: ${eligibility.reasons.join(', ')}`);
+        }
+    }
     if (notice.sourceUrl) {
         lines.push(notice.sourceUrl);
     }
