@@ -79,6 +79,27 @@ const summarizeEventGroup = (events: NotificationEvent[]): string => {
   return [header, body, ...uniqueChanged].filter(Boolean).join('\n');
 };
 
+const summarizeFailures = (failures: Failure[]): string[] => {
+  const detailFailureCounts = new Map<string, number>();
+  const lines: string[] = [];
+
+  for (const failure of failures) {
+    const message = failure.message ?? '원인 미상';
+    if (message.startsWith('상세 수집 실패 ')) {
+      detailFailureCounts.set(failure.source, (detailFailureCounts.get(failure.source) ?? 0) + 1);
+      continue;
+    }
+
+    lines.push(`${failure.source}: ${message}`);
+  }
+
+  for (const [source, count] of detailFailureCounts) {
+    lines.push(`${source}: 상세 수집 실패 ${count}건`);
+  }
+
+  return lines;
+};
+
 export const formatDailySummary = (
   events: NotificationEvent[],
   failures: Failure[] = [],
@@ -91,11 +112,7 @@ export const formatDailySummary = (
   const lines = Array.from(eventGroups.values()).map(summarizeEventGroup);
 
   if (failures.length > 0) {
-    lines.push(
-      ['수집 실패:', ...failures.map((failure) => `${failure.source}: ${failure.message ?? '원인 미상'}`)].join(
-        '\n',
-      ),
-    );
+    lines.push(['수집 실패:', ...summarizeFailures(failures)].join('\n'));
   }
 
   return lines.join('\n\n');

@@ -108,6 +108,20 @@ describe('formatDailySummary', () => {
         expect(summary).toContain('lh: network timeout');
         expect(summary).toContain('sh: 원인 미상');
     });
+    it('summarizes repeated detail collection failures by source', () => {
+        const summary = formatDailySummary([], [
+            { source: 'lh', message: '상세 수집 실패 notice-1: timeout' },
+            { source: 'lh', message: '상세 수집 실패 notice-2: timeout' },
+            { source: 'sh', message: '상세 수집 실패 notice-3: timeout' },
+            { source: 'sh', message: 'network timeout' },
+        ]);
+        expect(summary).toContain('수집 실패:');
+        expect(summary).toContain('lh: 상세 수집 실패 2건');
+        expect(summary).toContain('sh: 상세 수집 실패 1건');
+        expect(summary).toContain('sh: network timeout');
+        expect(summary).not.toContain('notice-1');
+        expect(summary).not.toContain('notice-2');
+    });
 });
 describe('formatNoticeDetails', () => {
     it('formats expandable notice details separately from the default summary', () => {
