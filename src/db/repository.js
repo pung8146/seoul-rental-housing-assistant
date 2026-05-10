@@ -33,6 +33,16 @@ const mapListingRow = (row) => ({
     status: row.status,
     metadata: parseObject(row.metadata_json),
 });
+const mapPersonalProfileRow = (row) => ({
+    birthYear: row.birth_year,
+    isHomeless: row.is_homeless == null ? null : row.is_homeless === 1,
+    residenceRegion: row.residence_region,
+    householdSize: row.household_size,
+    monthlyIncome: row.monthly_income,
+    totalAssets: row.total_assets,
+    vehicleValue: row.vehicle_value,
+    interestTags: parseArray(row.interest_tags),
+});
 export const createRepository = (filename, database = createDatabase(filename)) => {
     const upsertNoticeStatement = database.prepare(`
     INSERT INTO notices (
@@ -167,6 +177,28 @@ export const createRepository = (filename, database = createDatabase(filename)) 
                 changeHash: row.change_hash,
                 payload: JSON.parse(row.payload_json),
             }));
+        },
+        getPersonalProfile() {
+            const row = database.prepare('SELECT * FROM personal_profile WHERE id = 1').get();
+            return row ? mapPersonalProfileRow(row) : null;
+        },
+        savePersonalProfile(profile) {
+            database
+                .prepare(`INSERT INTO personal_profile (
+            id, birth_year, is_homeless, residence_region, household_size,
+            monthly_income, total_assets, vehicle_value, interest_tags
+          ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            birth_year = excluded.birth_year,
+            is_homeless = excluded.is_homeless,
+            residence_region = excluded.residence_region,
+            household_size = excluded.household_size,
+            monthly_income = excluded.monthly_income,
+            total_assets = excluded.total_assets,
+            vehicle_value = excluded.vehicle_value,
+            interest_tags = excluded.interest_tags,
+            updated_at = CURRENT_TIMESTAMP`)
+                .run(profile.birthYear, profile.isHomeless == null ? null : profile.isHomeless ? 1 : 0, profile.residenceRegion, profile.householdSize, profile.monthlyIncome, profile.totalAssets, profile.vehicleValue, serializeArray(profile.interestTags));
         },
         queryNotices(filters, options = {}) {
             const clauses = [];

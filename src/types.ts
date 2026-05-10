@@ -44,6 +44,17 @@ export const SourceRunSchema = z.object({
   message: NullableString,
 });
 
+export const PersonalProfileSchema = z.object({
+  birthYear: z.number().int().min(1900).max(2100).nullable(),
+  isHomeless: z.boolean().nullable(),
+  residenceRegion: NullableString,
+  householdSize: z.number().int().positive().nullable(),
+  monthlyIncome: NullableNumber,
+  totalAssets: NullableNumber,
+  vehicleValue: NullableNumber,
+  interestTags: z.array(z.string()),
+});
+
 export const NotificationEventSchema = z.object({
   type: z.enum(['new_notice', 'listing_added', 'listing_changed']),
   notice: NoticeSchema,
@@ -65,5 +76,6 @@ export const QueryFiltersSchema = z.object({
 export type Notice = z.infer<typeof NoticeSchema>;
 export type Listing = z.infer<typeof ListingSchema>;
 export type SourceRun = z.infer<typeof SourceRunSchema>;
+export type PersonalProfile = z.infer<typeof PersonalProfileSchema>;
 export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
 export type QueryFilters = z.infer<typeof QueryFiltersSchema>;

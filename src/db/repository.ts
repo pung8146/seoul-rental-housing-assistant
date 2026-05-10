@@ -1,5 +1,5 @@
 import { createDatabase, type SqliteDatabase } from './client.js';
-import type { Listing, Notice, QueryFilters, SourceRun } from '../types.js';
+import type { Listing, Notice, PersonalProfile, QueryFilters, SourceRun } from '../types.js';
 
 type NoticeRow = {
   source: string;
@@ -47,6 +47,17 @@ type ListingSnapshotRow = {
   payload_json: string;
 };
 
+type PersonalProfileRow = {
+  birth_year: number | null;
+  is_homeless: number | null;
+  residence_region: string | null;
+  household_size: number | null;
+  monthly_income: number | null;
+  total_assets: number | null;
+  vehicle_value: number | null;
+  interest_tags: string;
+};
+
 const serializeArray = (value: string[]) => JSON.stringify(value);
 const serializeObject = (value: Record<string, unknown>) => JSON.stringify(value);
 const parseArray = (value: string) => JSON.parse(value) as string[];
@@ -82,6 +93,17 @@ const mapListingRow = (row: ListingRow): Listing => ({
   floorAreaM2: row.floor_area_m2,
   status: row.status,
   metadata: parseObject(row.metadata_json),
+});
+
+const mapPersonalProfileRow = (row: PersonalProfileRow): PersonalProfile => ({
+  birthYear: row.birth_year,
+  isHomeless: row.is_homeless == null ? null : row.is_homeless === 1,
+  residenceRegion: row.residence_region,
+  householdSize: row.household_size,
+  monthlyIncome: row.monthly_income,
+  totalAssets: row.total_assets,
+  vehicleValue: row.vehicle_value,
+  interestTags: parseArray(row.interest_tags),
 });
 
 export const createRepository = (filename: string, database = createDatabase(filename)) => {
@@ -230,6 +252,41 @@ export const createRepository = (filename: string, database = createDatabase(fil
           changeHash: (row as ListingSnapshotRow).change_hash,
           payload: JSON.parse((row as ListingSnapshotRow).payload_json) as Listing,
         }));
+    },
+    getPersonalProfile() {
+      const row = database.prepare('SELECT * FROM personal_profile WHERE id = 1').get() as
+        | PersonalProfileRow
+        | undefined;
+      return row ? mapPersonalProfileRow(row) : null;
+    },
+    savePersonalProfile(profile: PersonalProfile) {
+      database
+        .prepare(
+          `INSERT INTO personal_profile (
+            id, birth_year, is_homeless, residence_region, household_size,
+            monthly_income, total_assets, vehicle_value, interest_tags
+          ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            birth_year = excluded.birth_year,
+            is_homeless = excluded.is_homeless,
+            residence_region = excluded.residence_region,
+            household_size = excluded.household_size,
+            monthly_income = excluded.monthly_income,
+            total_assets = excluded.total_assets,
+            vehicle_value = excluded.vehicle_value,
+            interest_tags = excluded.interest_tags,
+            updated_at = CURRENT_TIMESTAMP`,
+        )
+        .run(
+          profile.birthYear,
+          profile.isHomeless == null ? null : profile.isHomeless ? 1 : 0,
+          profile.residenceRegion,
+          profile.householdSize,
+          profile.monthlyIncome,
+          profile.totalAssets,
+          profile.vehicleValue,
+          serializeArray(profile.interestTags),
+        );
     },
     queryNotices(filters: QueryFilters, options: { limit?: number } = {}) {
       const clauses: string[] = [];

@@ -39,6 +39,16 @@ export const SourceRunSchema = z.object({
     status: z.enum(['success', 'partial', 'failure']),
     message: NullableString,
 });
+export const PersonalProfileSchema = z.object({
+    birthYear: z.number().int().min(1900).max(2100).nullable(),
+    isHomeless: z.boolean().nullable(),
+    residenceRegion: NullableString,
+    householdSize: z.number().int().positive().nullable(),
+    monthlyIncome: NullableNumber,
+    totalAssets: NullableNumber,
+    vehicleValue: NullableNumber,
+    interestTags: z.array(z.string()),
+});
 export const NotificationEventSchema = z.object({
     type: z.enum(['new_notice', 'listing_added', 'listing_changed']),
     notice: NoticeSchema,

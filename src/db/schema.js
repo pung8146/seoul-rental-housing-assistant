@@ -66,6 +66,19 @@ CREATE TABLE IF NOT EXISTS notification_history (
   UNIQUE(channel, payload_hash)
 );
 
+CREATE TABLE IF NOT EXISTS personal_profile (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  birth_year INTEGER,
+  is_homeless INTEGER,
+  residence_region TEXT,
+  household_size INTEGER,
+  monthly_income REAL,
+  total_assets REAL,
+  vehicle_value REAL,
+  interest_tags TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_notices_source_posted_at ON notices(source, posted_at);
 CREATE INDEX IF NOT EXISTS idx_listings_notice_source_id ON listings(source, notice_source_id);
 CREATE INDEX IF NOT EXISTS idx_listing_snapshots_stable_key ON listing_snapshots(listing_stable_key);
