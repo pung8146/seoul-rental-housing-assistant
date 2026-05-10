@@ -219,7 +219,7 @@ const renderSourceStatusBadge = (status: DashboardView['sourceStatuses'][number]
   `<span class="collect-badge ${status.runStatus}">${escapeHtml(status.statusLabel)}</span>`;
 
 const renderSourceStatus = (status: DashboardView['sourceStatuses'][number]): string => `
-  <article class="source-status">
+  <article class="source-status ${escapeHtml(status.runStatus)}">
     <div class="source-status-main">
       <strong>${escapeHtml(status.source.toUpperCase())}</strong>
       ${renderSourceStatusBadge(status)}
@@ -542,6 +542,18 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       border-radius: 8px;
       padding: 12px;
       background: #fbfcfe;
+    }
+    .source-status.success {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+    .source-status.partial {
+      border-color: #fde68a;
+      background: #fffbeb;
+    }
+    .source-status.failure {
+      border-color: #fecaca;
+      background: #fff1f2;
     }
     .source-status-main {
       display: flex;

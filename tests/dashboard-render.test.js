@@ -165,6 +165,8 @@ describe('renderDashboardHtml', () => {
         expect(html).toContain('기관별 수집 상태');
         expect(html).toContain('최근 성공');
         expect(html).toContain('최근 실패');
+        expect(html).toContain('class="source-status success"');
+        expect(html).toContain('class="source-status failure"');
         expect(html).toContain('전체 1건');
         expect(html).toContain('조건 1건');
         expect(html).toContain('첨부 1건');
@@ -264,5 +266,22 @@ describe('renderDashboardHtml', () => {
         expect(html).toContain('<span class="status-badge posted">공고중</span>');
         expect(html).toContain('<span class="status-badge unknown">확인필요</span>');
         expect(html).not.toContain('>진행</span>');
+    });
+    it('highlights partial source collection status as attention-needed', () => {
+        const html = renderDashboardHtml({
+            ...view,
+            sourceStatuses: [
+                {
+                    ...view.sourceStatuses[0],
+                    runStatus: 'partial',
+                    statusLabel: '최근 일부 실패',
+                    message: '상세 수집 실패 2건',
+                },
+            ],
+        });
+        expect(html).toContain('class="source-status partial"');
+        expect(html).toContain('class="collect-badge partial"');
+        expect(html).toContain('최근 일부 실패');
+        expect(html).toContain('상세 수집 실패 2건');
     });
 });
