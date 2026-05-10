@@ -91,7 +91,7 @@ const extractAttachments = (html) => {
 };
 const extractApplicationPeriod = (html) => {
     const text = stripHtml(html);
-    const match = text.match(/(?:신청접수기간|신청기간|접수기간)\s*:?\s*(\d{4}[-.]\d{2}[-.]\d{2})\s*~\s*(\d{4}[-.]\d{2}[-.]\d{2})/);
+    const match = text.match(/(?:신청접수기간|신청기간|접수기간)\s*:?\s*(\d{4}[-.]\d{2}[-.]\d{2})[\s\S]{0,40}?~[\s\S]{0,40}?(\d{4}[-.]\d{2}[-.]\d{2})/);
     if (!match) {
         return {};
     }

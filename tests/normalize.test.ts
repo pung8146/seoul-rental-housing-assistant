@@ -443,6 +443,39 @@ describe('adapter contract', () => {
     });
   });
 
+  it('extracts LH detail application periods with weekday and time text', () => {
+    const notice = {
+      sourceId: '2015122300019919',
+      title: '서울 행복주택 입주자 모집공고',
+      status: '공고중',
+      region: '서울',
+      postedAt: '2026-05-08',
+      sourceUrl: 'https://apply.lh.or.kr/detail',
+      metadata: {
+        provider: 'LH',
+        rawIds: { dataId1: '2015122300019919' },
+      },
+      listings: [
+        {
+          title: '서울 행복주택 입주자 모집공고',
+          region: '서울',
+          status: '공고중',
+        },
+      ],
+    };
+    const html = `
+      <section>
+        <h3>공급일정</h3>
+        <p>접수기간 : 2026.05.15(금) 10:00부터 ~ 2026.05.21(목) 17:00까지</p>
+      </section>
+    `;
+
+    expect(parseLhNoticeDetailHtml(html, notice)).toMatchObject({
+      applicationStartAt: '2026-05-15',
+      applicationEndAt: '2026-05-21',
+    });
+  });
+
   it('extracts LH detail eligibility requirements for downstream profile matching', () => {
     const notice = {
       sourceId: '2015122300019917',
@@ -914,6 +947,39 @@ describe('adapter contract', () => {
       <section>
         <h3>공급일정</h3>
         <p>신청접수기간 : 2026.05.15 ~ 2026.05.21</p>
+      </section>
+    `;
+
+    expect(parseShNoticeDetailHtml(html, notice)).toMatchObject({
+      applicationStartAt: '2026-05-15',
+      applicationEndAt: '2026-05-21',
+    });
+  });
+
+  it('extracts SH detail application periods with weekday and time text', () => {
+    const notice = {
+      sourceId: '304123',
+      title: '청년안심주택 입주자 모집공고',
+      status: 'posted',
+      region: '서울',
+      postedAt: '2026-05-08',
+      sourceUrl: 'https://www.i-sh.co.kr/main/view.do?seq=304123',
+      metadata: {
+        provider: 'SH',
+        rawIds: { seq: '304123' },
+      },
+      listings: [
+        {
+          title: '청년안심주택 입주자 모집공고',
+          region: '서울',
+          status: 'posted',
+        },
+      ],
+    };
+    const html = `
+      <section>
+        <h3>인터넷 청약 일정</h3>
+        <p>신청기간 : 2026.05.15(금) 10:00부터 ~ 2026.05.21(목) 17:00까지</p>
       </section>
     `;
 
