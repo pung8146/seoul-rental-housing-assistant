@@ -1,15 +1,25 @@
 import { createRepository } from '../db/repository.js';
+import { groupNotificationEvents } from '../domain/notification-policy.js';
 import { loadTelegramNotifyConfig, sendTelegramMessage } from '../notifier/telegram.js';
-import { createDefaultAdapters, formatCollectResult, runCollect } from './run-collect.js';
+import { formatPrioritizedDailySummary } from '../notifier/formatter.js';
+import { createDefaultAdapters, runCollect } from './run-collect.js';
 const NO_CHANGE_MESSAGE = '새 공고/변경 없음';
 const shouldNotify = (message, alwaysNotify) => alwaysNotify || message.trim() !== NO_CHANGE_MESSAGE;
+const getNotificationPolicy = () => process.argv.includes('--notify-all') || process.env.RENTAL_HOUSING_NOTIFY_POLICY === 'all' ? 'all' : 'actionable';
 const main = async () => {
     const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
     const dryRun = process.argv.includes('--dry-run');
     const alwaysNotify = process.argv.includes('--always-notify');
     try {
         const result = await runCollect({ adapters: createDefaultAdapters(), repository });
-        const message = formatCollectResult(result);
+        const policy = getNotificationPolicy();
+        const groups = groupNotificationEvents({
+            events: result.events,
+            failures: result.failures,
+            profile: repository.getPersonalProfile(),
+            policy,
+        });
+        const message = formatPrioritizedDailySummary(groups, result.failures) || NO_CHANGE_MESSAGE;
         console.log(message);
         if (!shouldNotify(message, alwaysNotify)) {
             return;

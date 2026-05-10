@@ -165,6 +165,24 @@ export const formatDailySummary = (events, failures = []) => {
     }
     return lines.join('\n\n');
 };
+const formatPriorityBlock = (title, events) => {
+    if (events.length === 0) {
+        return null;
+    }
+    const body = formatDailySummary(events);
+    return body ? `${title}\n${body}` : null;
+};
+export const formatPrioritizedDailySummary = (groups, failures = []) => {
+    const lines = [
+        formatPriorityBlock('바로 볼 공고', groups.high),
+        formatPriorityBlock('확인 필요한 공고', groups.review),
+        formatPriorityBlock('낮은 우선순위', groups.low),
+    ].filter((value) => Boolean(value));
+    if (failures.length > 0) {
+        lines.push(['수집 실패:', ...summarizeFailures(failures)].join('\n'));
+    }
+    return lines.join('\n\n');
+};
 export const formatNoticeDetails = (notice, listings, eligibility) => {
     const lines = [notice.title];
     lines.push(`신청상태: ${getApplicationStatus(notice)}`);

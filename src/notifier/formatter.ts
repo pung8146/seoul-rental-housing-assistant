@@ -1,6 +1,7 @@
 import type { Listing, NotificationEvent, Notice } from '../types.js';
 import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
 import type { EligibilityAssessment } from '../domain/eligibility.js';
+import type { PrioritizedNotificationEvents } from '../domain/notification-policy.js';
 
 export const formatNoticeSummaryLine = (notice: Notice, index: number, eligibility?: EligibilityAssessment): string => {
   const details = [notice.region, getApplicationStatus(notice), notice.postedAt ? `게시 ${notice.postedAt}` : null]
@@ -225,6 +226,32 @@ export const formatDailySummary = (
     eventGroups.set(key, [...(eventGroups.get(key) ?? []), event]);
   }
   const lines = Array.from(eventGroups.values()).map(summarizeEventGroup);
+
+  if (failures.length > 0) {
+    lines.push(['수집 실패:', ...summarizeFailures(failures)].join('\n'));
+  }
+
+  return lines.join('\n\n');
+};
+
+const formatPriorityBlock = (title: string, events: NotificationEvent[]): string | null => {
+  if (events.length === 0) {
+    return null;
+  }
+
+  const body = formatDailySummary(events);
+  return body ? `${title}\n${body}` : null;
+};
+
+export const formatPrioritizedDailySummary = (
+  groups: PrioritizedNotificationEvents,
+  failures: Failure[] = [],
+): string => {
+  const lines = [
+    formatPriorityBlock('바로 볼 공고', groups.high),
+    formatPriorityBlock('확인 필요한 공고', groups.review),
+    formatPriorityBlock('낮은 우선순위', groups.low),
+  ].filter((value): value is string => Boolean(value));
 
   if (failures.length > 0) {
     lines.push(['수집 실패:', ...summarizeFailures(failures)].join('\n'));
