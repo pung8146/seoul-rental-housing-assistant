@@ -8,6 +8,7 @@
     "test:watch": "vitest",
     "build": "tsc -p tsconfig.json",
     "collect": "tsx src/app/run-collect.ts",
+    "collect:notify": "tsx src/app/run-collect-and-notify.ts",
     "query": "tsx src/app/run-query.ts",
     "answer": "tsx src/app/run-assistant.ts",
     "dashboard": "tsx src/app/dashboard-server.ts"

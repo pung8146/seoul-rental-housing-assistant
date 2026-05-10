@@ -49,19 +49,50 @@ OpenClaw에서 호출할 때는 고정 래퍼를 쓰면 됩니다.
 
 ```bash
 npm run collect
+npm run collect:notify
 npm run collect -- --json
 npm run query -- 서울만 보여줘
 ```
 
 - `collect`: LH/SH에서 live 공고를 수집하고 텔레그램용 요약을 출력합니다.
+- `collect:notify`: 수집 후 신규/변경/실패가 있을 때 텔레그램으로 자동 발송합니다.
 - `collect -- --json`: 기존 JSON 결과가 필요할 때 사용합니다.
 - `query`: 저장된 DB를 기준으로 사용자 문장을 조회합니다.
+
+## 자동 수집/알림
+
+자동 운영용 래퍼는 중복 실행을 막고 로그를 남깁니다.
+
+```bash
+/home/pung8146/.openclaw/workspace/apps/rental-housing-assistant/scripts/collect-and-notify.sh
+```
+
+- 로그: `/home/pung8146/.openclaw/rental-housing-assistant/collect-notify.log`
+- DB: `/home/pung8146/.openclaw/rental-housing-assistant/rental-housing.db`
+- 새 공고/변경이 없으면 텔레그램을 보내지 않습니다.
+- `--always-notify`를 붙이면 변화가 없어도 결과를 보냅니다.
+- `--dry-run`을 붙이면 텔레그램 설정만 확인하고 실제 발송은 하지 않습니다.
+
+텔레그램 설정은 기본적으로 OpenClaw 설정(`/home/pung8146/.openclaw/openclaw.json`)의 Telegram 채널 정보를 사용합니다. 별도로 지정하려면 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 또는 `TELEGRAM_CHAT_IDS` 환경 변수를 사용합니다.
+
+Windows 작업 스케줄러 등록:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\pung8146\.openclaw\workspace\apps\rental-housing-assistant\scripts\install-windows-collect-task.ps1"
+```
+
+등록된 작업은 로그인 시 한 번 실행되고, 매시간 반복 실행됩니다. 현재 Windows 권한에서 고급 작업 등록이 막히면 스크립트가 자동으로 일반 작업 스케줄러 항목과 시작프로그램 `.cmd`를 함께 등록합니다. 삭제할 때는 아래 명령을 사용합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\pung8146\.openclaw\workspace\apps\rental-housing-assistant\scripts\uninstall-windows-collect-task.ps1"
+```
 
 ## 스크립트
 
 - `npm run build`: TypeScript 컴파일 확인
 - `npm test`: Vitest 전체 테스트
 - `npm run collect`: live 수집 실행
+- `npm run collect:notify`: live 수집 후 텔레그램 자동 알림
 - `npm run query`: 저장된 데이터 조회
 - `npm run answer`: OpenClaw/텔레그램에서 호출하기 쉬운 단일 응답 명령
 
@@ -71,6 +102,7 @@ npm run query -- 서울만 보여줘
 - LH 상세 링크 생성
 - SQLite 저장 및 변경 감지
 - 텔레그램용 수집 요약
+- 신규/변경 자동 텔레그램 알림
 - 자연어/옵션형 조회
 - OpenClaw/텔레그램 호출용 `answer` 진입점
 - LH 상세 테이블 기반 주택형/면적/보증금/월세 파싱
