@@ -467,6 +467,37 @@ describe('adapter contract', () => {
             },
         });
     });
+    it('extracts residence and household requirements from LH notice body text', () => {
+        const notice = {
+            sourceId: '2015122300019921',
+            title: '서울 청년 1인가구 매입임대주택 입주자 모집공고',
+            status: '공고중',
+            region: '서울',
+            postedAt: '2026-05-08',
+            sourceUrl: 'https://apply.lh.or.kr/detail',
+            metadata: {
+                provider: 'LH',
+                rawIds: { dataId1: '2015122300019921' },
+            },
+            listings: [],
+        };
+        const html = `
+      <section>
+        <h3>신청자격</h3>
+        <p>서울특별시 거주 무주택 1인 가구</p>
+      </section>
+    `;
+        expect(parseLhNoticeDetailHtml(html, notice)).toMatchObject({
+            metadata: {
+                eligibilityRequirements: {
+                    requiresHomeless: true,
+                    minHouseholdSize: 1,
+                    maxHouseholdSize: 1,
+                    residenceRegions: ['서울'],
+                },
+            },
+        });
+    });
     it('extracts LH detail attachments and marks the primary application notice file', () => {
         const notice = {
             sourceId: '2015122300019918',

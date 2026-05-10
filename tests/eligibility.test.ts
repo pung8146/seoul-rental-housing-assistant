@@ -175,4 +175,62 @@ describe('assessEligibility', () => {
       reasons: ['총자산 입력 필요'],
     });
   });
+
+  it('marks notices as not target when household size exceeds parsed limits', () => {
+    expect(
+      assessEligibility(
+        { ...profile, householdSize: 3 },
+        makeNotice({
+          metadata: {
+            eligibilityRequirements: {
+              minHouseholdSize: 1,
+              maxHouseholdSize: 1,
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 'not_target',
+      label: '대상 아님',
+      reasons: ['가구원수 조건 초과'],
+    });
+  });
+
+  it('marks notices as not target when required residence region differs', () => {
+    expect(
+      assessEligibility(
+        { ...profile, residenceRegion: '경기' },
+        makeNotice({
+          metadata: {
+            eligibilityRequirements: {
+              residenceRegions: ['서울'],
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 'not_target',
+      label: '대상 아님',
+      reasons: ['거주지역 조건 불일치'],
+    });
+  });
+
+  it('asks for review when required residence region exists but profile region is missing', () => {
+    expect(
+      assessEligibility(
+        { ...profile, residenceRegion: null },
+        makeNotice({
+          metadata: {
+            eligibilityRequirements: {
+              residenceRegions: ['서울'],
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 'financial_review',
+      label: '소득/자산 확인 필요',
+      reasons: ['거주지역 입력 필요'],
+    });
+  });
 });

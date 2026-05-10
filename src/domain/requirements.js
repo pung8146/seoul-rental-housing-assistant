@@ -8,6 +8,9 @@ export const extractEligibilityRequirementsFromText = (text) => {
     const incomeMatch = text.match(/(?:월평균소득|월소득)\s*([0-9,]+)\s*(원|만원)\s*이하/);
     const assetMatch = text.match(/총자산\s*([0-9,]+)\s*(원|만원)\s*이하/);
     const vehicleMatch = text.match(/자동차(?:가액)?\s*([0-9,]+)\s*(원|만원)\s*이하/);
+    const householdExactMatch = text.match(/(\d{1,2})\s*인\s*가구/);
+    const householdMaxMatch = text.match(/(\d{1,2})\s*인\s*이하/);
+    const residenceRegions = ['서울', '경기'].filter((region) => new RegExp(`${region}(?:특별시|시|도)?\\s*(?:거주|주민|소재)`).test(text));
     if (ageMatch) {
         requirements.minAge = Number(ageMatch[1]);
         requirements.maxAge = Number(ageMatch[2]);
@@ -23,6 +26,16 @@ export const extractEligibilityRequirementsFromText = (text) => {
     }
     if (vehicleMatch) {
         requirements.maxVehicleValue = parseKoreanMoney(vehicleMatch[1] ?? '0', vehicleMatch[2] ?? '원');
+    }
+    if (householdExactMatch) {
+        requirements.minHouseholdSize = Number(householdExactMatch[1]);
+        requirements.maxHouseholdSize = Number(householdExactMatch[1]);
+    }
+    else if (householdMaxMatch) {
+        requirements.maxHouseholdSize = Number(householdMaxMatch[1]);
+    }
+    if (residenceRegions.length > 0) {
+        requirements.residenceRegions = residenceRegions;
     }
     return Object.keys(requirements).length > 0 ? requirements : undefined;
 };

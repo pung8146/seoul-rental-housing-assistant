@@ -14,6 +14,14 @@ const getRequirementNumber = (requirements, key) => {
     const value = requirements[key];
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 };
+const getRequirementStringArray = (requirements, key) => {
+    const value = requirements[key];
+    if (!Array.isArray(value)) {
+        return undefined;
+    }
+    const strings = value.filter((item) => typeof item === 'string' && item.trim().length > 0);
+    return strings.length > 0 ? strings : undefined;
+};
 const getEligibilityRequirements = (notice) => {
     const raw = notice.metadata.eligibilityRequirements;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -23,10 +31,13 @@ const getEligibilityRequirements = (notice) => {
     return {
         minAge: getRequirementNumber(requirements, 'minAge'),
         maxAge: getRequirementNumber(requirements, 'maxAge'),
+        minHouseholdSize: getRequirementNumber(requirements, 'minHouseholdSize'),
+        maxHouseholdSize: getRequirementNumber(requirements, 'maxHouseholdSize'),
         requiresHomeless: requirements.requiresHomeless === true ? true : undefined,
         maxMonthlyIncome: getRequirementNumber(requirements, 'maxMonthlyIncome'),
         maxTotalAssets: getRequirementNumber(requirements, 'maxTotalAssets'),
         maxVehicleValue: getRequirementNumber(requirements, 'maxVehicleValue'),
+        residenceRegions: getRequirementStringArray(requirements, 'residenceRegions'),
     };
 };
 const getReferenceYear = (notice) => {
@@ -56,6 +67,30 @@ const assessParsedRequirements = (profile, notice) => {
     }
     if (requirements.requiresHomeless && profile.isHomeless !== true) {
         notTargetReasons.push('무주택 조건 미충족');
+    }
+    if (requirements.minHouseholdSize != null) {
+        if (profile.householdSize == null) {
+            financialReviewReasons.push('가구원수 입력 필요');
+        }
+        else if (profile.householdSize < requirements.minHouseholdSize) {
+            notTargetReasons.push('가구원수 조건 미달');
+        }
+    }
+    if (requirements.maxHouseholdSize != null) {
+        if (profile.householdSize == null) {
+            financialReviewReasons.push('가구원수 입력 필요');
+        }
+        else if (profile.householdSize > requirements.maxHouseholdSize) {
+            notTargetReasons.push('가구원수 조건 초과');
+        }
+    }
+    if (requirements.residenceRegions && requirements.residenceRegions.length > 0) {
+        if (!profile.residenceRegion) {
+            financialReviewReasons.push('거주지역 입력 필요');
+        }
+        else if (!requirements.residenceRegions.includes(profile.residenceRegion)) {
+            notTargetReasons.push('거주지역 조건 불일치');
+        }
     }
     if (requirements.maxMonthlyIncome != null) {
         if (profile.monthlyIncome == null) {
