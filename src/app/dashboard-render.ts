@@ -228,6 +228,76 @@ const renderPrimaryApplicationAttachment = (notice: Notice): string => {
   `;
 };
 
+type DetailQualityStatus = 'ok' | 'review' | 'missing';
+
+type DetailQualityItem = {
+  label: string;
+  status: DetailQualityStatus;
+  value: string;
+};
+
+const hasEligibilityRequirements = (notice: Notice): boolean => {
+  const requirements = notice.metadata.eligibilityRequirements;
+  return Boolean(
+    requirements &&
+      typeof requirements === 'object' &&
+      !Array.isArray(requirements) &&
+      Object.keys(requirements).length > 0,
+  );
+};
+
+const applicationPeriodQuality = (notice: Notice): DetailQualityItem => {
+  if (notice.applicationStartAt && notice.applicationEndAt) {
+    return { label: '신청기간', status: 'ok', value: '확인됨' };
+  }
+  if (notice.applicationStartAt || notice.applicationEndAt) {
+    return { label: '신청기간', status: 'review', value: '일부 확인' };
+  }
+  return { label: '신청기간', status: 'missing', value: '확인필요' };
+};
+
+const applicationAttachmentQuality = (notice: Notice, attachments: Attachment[]): DetailQualityItem => {
+  if (getPrimaryApplicationAttachment(notice.metadata)) {
+    return { label: '공고문', status: 'ok', value: '확인됨' };
+  }
+  if (attachments.length > 0) {
+    return { label: '공고문', status: 'review', value: '첨부 있음' };
+  }
+  return { label: '공고문', status: 'missing', value: '확인필요' };
+};
+
+const renderDetailQuality = (
+  notice: Notice,
+  listings: Listing[],
+  attachments: Attachment[],
+): string => {
+  const items: DetailQualityItem[] = [
+    applicationPeriodQuality(notice),
+    applicationAttachmentQuality(notice, attachments),
+    hasEligibilityRequirements(notice)
+      ? { label: '신청조건', status: 'ok', value: '추출됨' }
+      : { label: '신청조건', status: 'missing', value: '확인필요' },
+    listings.length > 0
+      ? { label: '매물정보', status: 'ok', value: `${listings.length}건` }
+      : { label: '매물정보', status: 'missing', value: '확인필요' },
+  ];
+
+  return `
+    <div class="detail-quality">
+      ${items
+        .map(
+          (item) => `
+            <div class="detail-quality-item ${item.status}">
+              <span>${escapeHtml(item.label)}</span>
+              <strong>${escapeHtml(item.value)}</strong>
+            </div>
+          `,
+        )
+        .join('')}
+    </div>
+  `;
+};
+
 const renderNoticeRow = (notice: DashboardView['actionableNotices'][number], selectedKey?: string): string => `
   <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="/?notice=${encodeURIComponent(
     notice.noticeKey,
@@ -596,6 +666,38 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       min-width: 0;
     }
     .field span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .detail-quality {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .detail-quality-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcfe;
+    }
+    .detail-quality-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .detail-quality-item strong {
+      font-size: 13px;
+    }
+    .detail-quality-item.ok {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+    .detail-quality-item.review {
+      border-color: #fde68a;
+      background: #fffbeb;
+    }
+    .detail-quality-item.missing {
+      border-color: #fecaca;
+      background: #fff1f2;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -718,7 +820,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
     }
     @media (max-width: 900px) {
       main { grid-template-columns: 1fr; }
-      .detail-grid, .stats { grid-template-columns: 1fr; }
+      .detail-grid, .detail-quality, .stats { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -787,6 +889,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
                   <div class="field"><span>마감</span>${escapeHtml(formatDate(selectedNotice.applicationEndAt))}</div>
                   <div class="field"><span>지원가능성</span>${renderEligibilityBadge(selectedNotice)}${renderEligibilityReasons(selectedNotice)}</div>
                 </div>
+                ${renderDetailQuality(selectedNotice, view.selectedNotice?.listings ?? [], attachments)}
                 <div class="attachments">
                   ${attachments.map((attachment) => `<a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>`).join('')}
                 </div>

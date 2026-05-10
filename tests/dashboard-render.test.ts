@@ -194,6 +194,15 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('name="birthYear"');
     expect(html).toContain('value="1995"');
     expect(html).toContain('지원가능성 높음');
+    expect(html).toContain('class="detail-quality-item review"');
+    expect(html).toContain('<span>신청기간</span>');
+    expect(html).toContain('<strong>일부 확인</strong>');
+    expect(html).toContain('<span>공고문</span>');
+    expect(html).toContain('<strong>확인됨</strong>');
+    expect(html).toContain('<span>신청조건</span>');
+    expect(html).toContain('<strong>확인필요</strong>');
+    expect(html).toContain('<span>매물정보</span>');
+    expect(html).toContain('<strong>1건</strong>');
     expect(html).toContain('16형 대학생');
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert(1)</script>');
