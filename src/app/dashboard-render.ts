@@ -237,6 +237,19 @@ const renderSourceStatus = (status: DashboardView['sourceStatuses'][number]): st
   </article>
 `;
 
+const renderSourceIssueSummary = (view: DashboardView): string => {
+  const issueStatuses = view.sourceStatuses.filter((status) => status.runStatus !== 'success');
+  if (issueStatuses.length === 0) {
+    return '';
+  }
+
+  const summary = issueStatuses
+    .map((status) => `${status.source.toUpperCase()} ${status.statusLabel}`)
+    .join(' · ');
+
+  return `<div class="source-issue-summary">수집 확인 필요: ${escapeHtml(summary)}</div>`;
+};
+
 export const renderDashboardHtml = (view: DashboardView): string => {
   const selectedKey = view.selectedNotice?.notice.noticeKey;
   const selectedNotice = view.selectedNotice?.notice;
@@ -313,6 +326,16 @@ export const renderDashboardHtml = (view: DashboardView): string => {
     }
     .stat strong { display: block; font-size: 24px; margin-bottom: 4px; }
     .stat span, .notice-meta, .muted { color: var(--muted); }
+    .source-issue-summary {
+      margin: 0 16px 16px;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: #854d0e;
+      background: #fffbeb;
+      font-size: 13px;
+      font-weight: 650;
+    }
     .status-badge {
       display: inline-flex;
       width: fit-content;
@@ -660,6 +683,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
           <div class="stat"><strong>${view.stats.sourceRunCount}</strong><span>수집 기록</span></div>
           <div class="stat"><strong>${view.stats.sourceIssueCount}</strong><span>수집 주의</span></div>
         </div>
+        ${renderSourceIssueSummary(view)}
       </section>
       <section>
         <div class="section-header">

@@ -169,6 +169,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('제외된 글');
     expect(html).toContain('수집 상태');
     expect(html).toContain('<strong>1</strong><span>수집 주의</span>');
+    expect(html).toContain('수집 확인 필요: SH 최근 실패');
     expect(html).toContain('기관별 수집 상태');
     expect(html).toContain('최근 성공');
     expect(html).toContain('최근 실패');
@@ -298,5 +299,25 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('class="collect-badge partial"');
     expect(html).toContain('최근 일부 실패');
     expect(html).toContain('상세 수집 실패 2건');
+  });
+
+  it('does not render a source issue summary when every source is healthy', () => {
+    const html = renderDashboardHtml({
+      ...view,
+      stats: {
+        ...view.stats,
+        sourceIssueCount: 0,
+      },
+      sourceStatuses: [
+        {
+          ...view.sourceStatuses[0]!,
+          runStatus: 'success',
+          statusLabel: '최근 성공',
+          message: null,
+        },
+      ],
+    });
+
+    expect(html).not.toContain('수집 확인 필요:');
   });
 });
