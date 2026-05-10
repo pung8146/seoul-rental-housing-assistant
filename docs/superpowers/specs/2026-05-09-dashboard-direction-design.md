@@ -27,6 +27,8 @@ The first screen is an admin dashboard with dense, operational information:
 - Actionable notices list
 - Source, region, status, posted date, and application deadline when available
 - Recommendation score placeholder
+- A single local personal eligibility profile
+- Eligibility labels that separate clear matches from unknown requirements
 - Detail view with source URL, listing rows, attachments, and parsed metadata
 - Excluded notice review list with exclusion reason
 - Collection status, last run time, and error summary
@@ -41,9 +43,35 @@ The dashboard should be structured around these boundaries:
 
 - Domain filters decide whether a notice is actionable.
 - Repository queries return notices, listings, metadata, and collection status.
+- The repository stores one local personal profile for eligibility checks.
 - Recommendation logic scores notices later, without depending on Telegram or UI code.
+- Eligibility logic should be conservative: only call a notice likely eligible when the profile and parsed notice data support it; otherwise label it as needing review.
 - Web routes/components render dashboard views from repository data.
 - Future application automation lives behind a separate module boundary and requires explicit user approval before any submission-like action.
+
+## Personal Eligibility
+
+The first eligibility version stores one profile in the local SQLite database. It is a personal admin tool, not a multi-user account system.
+
+The profile should include:
+
+- Birth date or age
+- Homeless status
+- Residence region
+- Household size
+- Monthly income
+- Total assets
+- Vehicle value
+- Interest tags such as youth, newlywed, college student, senior, or general
+
+The dashboard should use this profile to add conservative labels:
+
+- `지원가능성 높음` when available parsed data matches the profile
+- `조건 확인 필요` when the notice is relevant but the parser lacks enough requirements
+- `대상 아님` when the notice clearly targets a different group
+- `소득/자산 확인 필요` when financial thresholds are not parsed
+
+This feature does not guarantee legal eligibility. It narrows the list so the operator can focus on the most plausible notices.
 
 ## Future Automation Path
 
@@ -68,4 +96,4 @@ This keeps the current project useful now while reducing risk around accounts, a
 
 - Which framework should host the dashboard: a tiny built-in server, Vite app, or a full app framework?
 - Should the first dashboard be read-only, or include manual controls like "mark as ignored" and "pin candidate"?
-- What personal eligibility fields should be modeled first for scoring?
+- Which notice requirement fields should be parsed next beyond title tags and application periods?
