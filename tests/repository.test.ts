@@ -545,4 +545,59 @@ describe('sqlite repository', () => {
       }),
     ]);
   });
+
+  it('extracts eligibility requirements from primary attachment text when detail HTML is incomplete', async () => {
+    const repository = createRepository(':memory:');
+    const adapter: SourceAdapter = {
+      source: 'lh',
+      async fetchNotices() {
+        return [
+          {
+            sourceId: 'notice-attachment',
+            title: '서울 청년 매입임대주택 입주자 모집공고',
+            region: '서울',
+            targetTags: ['청년'],
+            postedAt: '2026-05-07',
+            sourceUrl: 'https://example.com/notices/attachment',
+            metadata: {
+              attachments: [
+                {
+                  title: '서울 청년 매입임대주택 입주자 모집공고문.txt',
+                  url: 'https://example.com/notice.txt',
+                },
+              ],
+              primaryApplicationAttachment: {
+                title: '서울 청년 매입임대주택 입주자 모집공고문.txt',
+                url: 'https://example.com/notice.txt',
+              },
+            },
+            listings: [],
+          },
+        ];
+      },
+    };
+
+    await runCollect({
+      adapters: [adapter],
+      repository,
+      documentFetch: async () =>
+        new Response(
+          '신청자격: 만 19세 이상 만 39세 이하 무주택자. 월평균소득 3,589,957원 이하, 총자산 34,500만원 이하, 자동차가액 3,708만원 이하',
+        ),
+    });
+
+    expect(repository.findNoticeBySourceId('lh', 'notice-attachment')).toMatchObject({
+      metadata: {
+        attachmentBodyPreview: expect.stringContaining('신청자격'),
+        eligibilityRequirements: {
+          minAge: 19,
+          maxAge: 39,
+          requiresHomeless: true,
+          maxMonthlyIncome: 3589957,
+          maxTotalAssets: 345000000,
+          maxVehicleValue: 37080000,
+        },
+      },
+    });
+  });
 });

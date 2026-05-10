@@ -4,7 +4,10 @@ import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
 import { createRepository, type Repository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
+import { findPrimaryApplicationAttachment, type Attachment } from '../domain/attachments.js';
+import { fetchDocumentTexts } from '../domain/document-text.js';
 import { normalizeAdapterOutput, normalizeRegion } from '../domain/normalize.js';
+import { extractEligibilityRequirementsFromText } from '../domain/requirements.js';
 import { formatDailySummary } from '../notifier/formatter.js';
 import type { NotificationEvent } from '../types.js';
 
@@ -17,6 +20,7 @@ export type RunCollectInput = {
   adapters: SourceAdapter[];
   repository: Repository;
   regions?: string[];
+  documentFetch?: typeof fetch;
 };
 
 export type RunCollectResult = {
@@ -79,10 +83,64 @@ const hydrateNoticeDetails = async (
   return { notices: hydrated, failures: detailFailures };
 };
 
+const getAttachments = (notice: RawNoticeCandidate): Attachment[] => {
+  const attachments = notice.metadata?.attachments;
+  if (!Array.isArray(attachments)) {
+    return [];
+  }
+
+  return attachments.filter(
+    (attachment): attachment is Attachment =>
+      typeof attachment === 'object' &&
+      attachment !== null &&
+      typeof (attachment as Attachment).title === 'string' &&
+      typeof (attachment as Attachment).url === 'string',
+  );
+};
+
+const hydrateNoticeDocumentTexts = async (
+  notices: RawNoticeCandidate[],
+  fetchImpl: typeof fetch,
+): Promise<RawNoticeCandidate[]> => {
+  const hydrated: RawNoticeCandidate[] = [];
+
+  for (const notice of notices) {
+    const attachments = getAttachments(notice);
+    const primaryAttachment = findPrimaryApplicationAttachment(attachments);
+    if (!primaryAttachment || notice.metadata?.eligibilityRequirements) {
+      hydrated.push(notice);
+      continue;
+    }
+
+    const documentText = await fetchDocumentTexts([primaryAttachment], fetchImpl);
+    const extractedText = documentText.results[0]?.text;
+    const eligibilityRequirements = extractedText
+      ? extractEligibilityRequirementsFromText(extractedText)
+      : undefined;
+    const failures = documentText.failures.map((failure) => ({
+      title: failure.attachment.title,
+      message: failure.message,
+    }));
+
+    hydrated.push({
+      ...notice,
+      metadata: {
+        ...(notice.metadata ?? {}),
+        ...(extractedText ? { attachmentBodyPreview: extractedText.slice(0, 300) } : {}),
+        ...(eligibilityRequirements ? { eligibilityRequirements } : {}),
+        ...(failures.length > 0 ? { attachmentTextFailures: failures } : {}),
+      },
+    });
+  }
+
+  return hydrated;
+};
+
 export const runCollect = async ({
   adapters,
   repository,
   regions = DEFAULT_COLLECT_REGIONS,
+  documentFetch = fetch,
 }: RunCollectInput): Promise<RunCollectResult> => {
   const events: NotificationEvent[] = [];
   const failures: CollectFailure[] = [];
@@ -107,7 +165,7 @@ export const runCollect = async ({
       const scopedNotices = filterNoticesByRegion(rawNotices, regions);
       const detailResult = await hydrateNoticeDetails(adapter, scopedNotices);
       failures.push(...detailResult.failures);
-      const detailedNotices = detailResult.notices;
+      const detailedNotices = await hydrateNoticeDocumentTexts(detailResult.notices, documentFetch);
       const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
 
       for (const notice of notices) {
