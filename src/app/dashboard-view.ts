@@ -37,6 +37,7 @@ export type DashboardView = {
     excludedCount: number;
     sourceRunCount: number;
     sourceIssueCount: number;
+    lastCollectedAt: string | null;
   };
   profile: PersonalProfile | null;
   actionableNotices: DashboardNoticeSummary[];
@@ -188,6 +189,7 @@ export const buildDashboardView = ({
     repository,
     sourceRuns,
   });
+  const latestSourceRun = latestFirst(sourceRuns)[0] ?? null;
 
   return {
     stats: {
@@ -195,6 +197,7 @@ export const buildDashboardView = ({
       excludedCount: excludedNotices.length,
       sourceRunCount: sourceRuns.length,
       sourceIssueCount: sourceStatuses.filter((status) => status.runStatus !== 'success').length,
+      lastCollectedAt: latestSourceRun?.finishedAt ?? null,
     },
     profile,
     actionableNotices: sortedActionableNotices,

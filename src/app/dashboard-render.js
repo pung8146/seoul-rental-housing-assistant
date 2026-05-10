@@ -7,6 +7,30 @@ const escapeHtml = (value) => String(value ?? '')
     .replace(/'/g, '&#39;');
 const formatMoney = (value) => typeof value === 'number' ? `${value.toLocaleString('ko-KR')}원` : '미정';
 const formatDate = (value) => value ?? '-';
+const formatKoreaDateTime = (value) => {
+    if (!value) {
+        return '-';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        day: '2-digit',
+        hour: '2-digit',
+        hour12: false,
+        minute: '2-digit',
+        month: '2-digit',
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+    const hour = parts.find((part) => part.type === 'hour')?.value ?? '00';
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+    return `${year}-${month}-${day} ${hour}:${minute}`;
+};
 const formatInputValue = (value) => (value === null ? '' : String(value));
 const getKoreaToday = () => {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -253,7 +277,7 @@ export const renderDashboardHtml = (view) => {
     }
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
       padding: 16px;
     }
@@ -264,6 +288,7 @@ export const renderDashboardHtml = (view) => {
       background: #fbfcfe;
     }
     .stat strong { display: block; font-size: 24px; margin-bottom: 4px; }
+    .stat.timestamp strong { font-size: 16px; line-height: 1.25; }
     .stat span, .notice-meta, .muted { color: var(--muted); }
     .source-issue-summary {
       margin: 0 16px 16px;
@@ -619,6 +644,7 @@ export const renderDashboardHtml = (view) => {
           <div class="stat"><strong>${view.stats.excludedCount}</strong><span>제외됨</span></div>
           <div class="stat"><strong>${view.stats.sourceRunCount}</strong><span>수집 기록</span></div>
           <div class="stat"><strong>${view.stats.sourceIssueCount}</strong><span>수집 주의</span></div>
+          <div class="stat timestamp"><strong>${escapeHtml(formatKoreaDateTime(view.stats.lastCollectedAt))}</strong><span>마지막 수집</span></div>
         </div>
         ${renderSourceIssueSummary(view)}
       </section>

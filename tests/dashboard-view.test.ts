@@ -90,6 +90,7 @@ describe('buildDashboardView', () => {
     expect(view.stats.actionableCount).toBe(2);
     expect(view.stats.excludedCount).toBe(1);
     expect(view.stats.sourceIssueCount).toBe(1);
+    expect(view.stats.lastCollectedAt).toBe('2026-05-09T10:00:02.000Z');
     expect(view.profile?.birthYear).toBe(1995);
     expect(view.actionableNotices.map((notice) => notice.eligibility.label)).toEqual([
       '지원가능성 높음',

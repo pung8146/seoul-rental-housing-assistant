@@ -102,12 +102,14 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
         repository,
         sourceRuns,
     });
+    const latestSourceRun = latestFirst(sourceRuns)[0] ?? null;
     return {
         stats: {
             actionableCount: actionableNotices.length,
             excludedCount: excludedNotices.length,
             sourceRunCount: sourceRuns.length,
             sourceIssueCount: sourceStatuses.filter((status) => status.runStatus !== 'success').length,
+            lastCollectedAt: latestSourceRun?.finishedAt ?? null,
         },
         profile,
         actionableNotices: sortedActionableNotices,

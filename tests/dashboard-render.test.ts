@@ -9,6 +9,7 @@ const view: DashboardView = {
     excludedCount: 1,
     sourceRunCount: 1,
     sourceIssueCount: 1,
+    lastCollectedAt: '2026-05-09T10:00:02.000Z',
   },
   profile: {
     birthYear: 1995,
@@ -169,6 +170,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('제외된 글');
     expect(html).toContain('수집 상태');
     expect(html).toContain('<strong>1</strong><span>수집 주의</span>');
+    expect(html).toContain('<strong>2026-05-09 19:00</strong><span>마지막 수집</span>');
     expect(html).toContain('수집 확인 필요: SH 최근 실패');
     expect(html).toContain('기관별 수집 상태');
     expect(html).toContain('최근 성공');
