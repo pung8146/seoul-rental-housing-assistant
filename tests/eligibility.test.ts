@@ -60,4 +60,63 @@ describe('assessEligibility', () => {
       label: '소득/자산 확인 필요',
     });
   });
+
+  it('marks notices as not target when parsed age requirements exclude the profile', () => {
+    expect(
+      assessEligibility(
+        { ...profile, birthYear: 1980 },
+        makeNotice({
+          postedAt: '2026-05-09',
+          metadata: {
+            eligibilityRequirements: {
+              minAge: 19,
+              maxAge: 39,
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 'not_target',
+      label: '대상 아님',
+      reasons: ['나이 조건 초과'],
+    });
+  });
+
+  it('marks notices as not target when parsed financial limits are exceeded', () => {
+    expect(
+      assessEligibility(
+        { ...profile, monthlyIncome: 4000000 },
+        makeNotice({
+          metadata: {
+            eligibilityRequirements: {
+              maxMonthlyIncome: 3589957,
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 'not_target',
+      label: '대상 아님',
+      reasons: ['소득 기준 초과'],
+    });
+  });
+
+  it('asks for financial review when parsed financial limits exist but profile values are missing', () => {
+    expect(
+      assessEligibility(
+        { ...profile, totalAssets: null },
+        makeNotice({
+          metadata: {
+            eligibilityRequirements: {
+              maxTotalAssets: 345000000,
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 'financial_review',
+      label: '소득/자산 확인 필요',
+      reasons: ['총자산 입력 필요'],
+    });
+  });
 });

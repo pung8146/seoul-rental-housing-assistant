@@ -431,6 +431,51 @@ describe('adapter contract', () => {
     });
   });
 
+  it('extracts LH detail eligibility requirements for downstream profile matching', () => {
+    const notice = {
+      sourceId: '2015122300019917',
+      title: '서울 청년 매입임대주택 입주자 모집공고',
+      status: '공고중',
+      region: '서울',
+      postedAt: '2026-05-08',
+      sourceUrl: 'https://apply.lh.or.kr/detail',
+      metadata: {
+        provider: 'LH',
+        rawIds: { dataId1: '2015122300019917' },
+      },
+      listings: [
+        {
+          title: '서울 청년 매입임대주택 입주자 모집공고',
+          supplyType: '매입임대',
+          region: '서울',
+          status: '공고중',
+        },
+      ],
+    };
+    const html = `
+      <section>
+        <h3>신청자격</h3>
+        <p>입주자모집공고일 현재 만 19세 이상 만 39세 이하인 무주택자</p>
+        <p>월평균소득 3,589,957원 이하, 총자산 34,500만원 이하, 자동차가액 3,708만원 이하</p>
+      </section>
+    `;
+
+    expect(parseLhNoticeDetailHtml(html, notice)).toMatchObject({
+      metadata: {
+        provider: 'LH',
+        rawIds: { dataId1: '2015122300019917' },
+        eligibilityRequirements: {
+          minAge: 19,
+          maxAge: 39,
+          requiresHomeless: true,
+          maxMonthlyIncome: 3589957,
+          maxTotalAssets: 345000000,
+          maxVehicleValue: 37080000,
+        },
+      },
+    });
+  });
+
   it('fetches LH notice details from the list-provided detail URL', async () => {
     const listHtml = `
       <table>
