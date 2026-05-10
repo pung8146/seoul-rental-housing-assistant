@@ -291,6 +291,49 @@ describe('sqlite repository', () => {
             }),
         ]);
     });
+    it('keeps list notices and records partial status when a detail fetch fails', async () => {
+        const repository = createRepository(':memory:');
+        const adapter = {
+            source: 'lh',
+            async fetchNotices() {
+                return [
+                    {
+                        sourceId: 'notice-1',
+                        title: '서울 청년 임대주택 모집',
+                        region: '서울',
+                        postedAt: '2026-05-07',
+                        sourceUrl: 'https://example.com/notices/1',
+                        listings: [{ title: '목록 매물', region: '서울' }],
+                    },
+                ];
+            },
+            async fetchNoticeDetails() {
+                throw new Error('detail timeout');
+            },
+        };
+        const result = await runCollect({ repository, adapters: [adapter] });
+        expect(result.events).toHaveLength(1);
+        expect(result.failures).toEqual([
+            {
+                source: 'lh',
+                message: '상세 수집 실패 notice-1: detail timeout',
+            },
+        ]);
+        expect(repository.findNoticeBySourceId('lh', 'notice-1')).toMatchObject({
+            title: '서울 청년 임대주택 모집',
+            region: '서울',
+        });
+        expect(repository.queryListingsByNotice('lh', 'notice-1')).toMatchObject([
+            expect.objectContaining({ title: '목록 매물' }),
+        ]);
+        expect(repository.listSourceRuns()).toMatchObject([
+            {
+                source: 'lh',
+                status: 'partial',
+                message: '상세 수집 실패 1건',
+            },
+        ]);
+    });
     it('removes stale listings when a later collection has a cleaner listing identity', async () => {
         const repository = createRepository(':memory:');
         const firstAdapter = {

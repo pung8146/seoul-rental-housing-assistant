@@ -21,18 +21,28 @@ const filterNoticesByRegion = (rawNotices, regions) => rawNotices.filter((notice
 });
 const hydrateNoticeDetails = async (adapter, rawNotices) => {
     if (!adapter.fetchNoticeDetails) {
-        return rawNotices;
+        return { notices: rawNotices, failures: [] };
     }
     const hydrated = [];
+    const detailFailures = [];
     for (let index = 0; index < rawNotices.length; index += DETAIL_FETCH_CONCURRENCY) {
         const chunk = rawNotices.slice(index, index + DETAIL_FETCH_CONCURRENCY);
         const detailedChunk = await Promise.all(chunk.map(async (rawNotice) => {
-            const detailedNotice = await adapter.fetchNoticeDetails?.(rawNotice.sourceId);
-            return detailedNotice ?? rawNotice;
+            try {
+                const detailedNotice = await adapter.fetchNoticeDetails?.(rawNotice.sourceId);
+                return detailedNotice ?? rawNotice;
+            }
+            catch (error) {
+                detailFailures.push({
+                    source: adapter.source,
+                    message: `상세 수집 실패 ${rawNotice.sourceId}: ${toMessage(error)}`,
+                });
+                return rawNotice;
+            }
         }));
         hydrated.push(...detailedChunk);
     }
-    return hydrated;
+    return { notices: hydrated, failures: detailFailures };
 };
 export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLECT_REGIONS, }) => {
     const events = [];
@@ -53,7 +63,9 @@ export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLE
                 continue;
             }
             const scopedNotices = filterNoticesByRegion(rawNotices, regions);
-            const detailedNotices = await hydrateNoticeDetails(adapter, scopedNotices);
+            const detailResult = await hydrateNoticeDetails(adapter, scopedNotices);
+            failures.push(...detailResult.failures);
+            const detailedNotices = detailResult.notices;
             const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
             for (const notice of notices) {
                 const incomingListings = listings.filter((listing) => listing.source === notice.source && listing.noticeSourceId === notice.sourceId);
@@ -81,8 +93,8 @@ export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLE
                 source: adapter.source,
                 startedAt,
                 finishedAt: new Date().toISOString(),
-                status: 'success',
-                message: null,
+                status: detailResult.failures.length > 0 ? 'partial' : 'success',
+                message: detailResult.failures.length > 0 ? `상세 수집 실패 ${detailResult.failures.length}건` : null,
             });
         }
         catch (error) {
