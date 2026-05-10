@@ -35,6 +35,12 @@ export type SourceCollectionStatus = {
   attachmentNotices: number;
 };
 
+export type NotificationOperationStatus = {
+  totalSent: number;
+  channelCount: number;
+  lastSentAt: string | null;
+};
+
 export type DashboardView = {
   stats: {
     actionableCount: number;
@@ -50,10 +56,14 @@ export type DashboardView = {
   selectedNotice: SelectedDashboardNotice | null;
   sourceStatuses: SourceCollectionStatus[];
   sourceRuns: SourceRun[];
+  notificationStatus: NotificationOperationStatus;
 };
 
 type BuildDashboardViewInput = {
-  repository: Pick<Repository, 'queryNotices' | 'queryListingsByNotice' | 'listSourceRuns' | 'getPersonalProfile'>;
+  repository: Pick<
+    Repository,
+    'queryNotices' | 'queryListingsByNotice' | 'listSourceRuns' | 'getPersonalProfile' | 'listNotificationHistory'
+  >;
   selectedNoticeKey?: string | null;
 };
 
@@ -202,12 +212,21 @@ const buildSourceStatuses = ({
   });
 };
 
+const buildNotificationStatus = (
+  notificationHistory: ReturnType<Repository['listNotificationHistory']>,
+): NotificationOperationStatus => ({
+  totalSent: notificationHistory.length,
+  channelCount: new Set(notificationHistory.map((history) => history.channel)).size,
+  lastSentAt: notificationHistory[0]?.sentAt ?? null,
+});
+
 export const buildDashboardView = ({
   repository,
   selectedNoticeKey,
 }: BuildDashboardViewInput): DashboardView => {
   const notices = repository.queryNotices({});
   const sourceRuns = repository.listSourceRuns();
+  const notificationHistory = repository.listNotificationHistory();
   const profile = repository.getPersonalProfile();
   const actionableNotices: DashboardNoticeSummary[] = [];
   const excludedNotices: ExcludedDashboardNotice[] = [];
@@ -260,5 +279,6 @@ export const buildDashboardView = ({
       : null,
     sourceStatuses,
     sourceRuns: latestFirst(sourceRuns).slice(0, 10),
+    notificationStatus: buildNotificationStatus(notificationHistory),
   };
 };

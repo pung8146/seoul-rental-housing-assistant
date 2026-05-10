@@ -471,7 +471,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
     }
     .stats {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
       padding: 16px;
     }
@@ -930,6 +930,9 @@ export const renderDashboardHtml = (view: DashboardView): string => {
           <div class="stat"><strong>${view.stats.sourceRunCount}</strong><span>수집 기록</span></div>
           <div class="stat"><strong>${view.stats.sourceIssueCount}</strong><span>수집 주의</span></div>
           <div class="stat timestamp"><strong>${escapeHtml(formatKoreaDateTime(view.stats.lastCollectedAt))}</strong><span>마지막 수집</span><span class="collection-freshness ${collectionFreshness.className}">${collectionFreshness.label}</span></div>
+          <div class="stat timestamp"><strong>${escapeHtml(formatKoreaDateTime(view.notificationStatus.lastSentAt))}</strong><span>마지막 알림</span></div>
+          <div class="stat"><strong>${view.notificationStatus.totalSent}</strong><span>알림 발송</span></div>
+          <div class="stat"><strong>${view.notificationStatus.channelCount}</strong><span>알림 채널</span></div>
         </div>
         ${renderSourceIssueSummary(view)}
       </section>

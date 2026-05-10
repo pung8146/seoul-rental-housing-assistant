@@ -81,6 +81,8 @@ describe('buildDashboardView', () => {
       status: 'success',
       message: null,
     });
+    repository.recordNotification('telegram:123', 'payload-1', '2026-05-09T10:05:00.000Z');
+    repository.recordNotification('telegram:456', 'payload-1', '2026-05-09T10:06:00.000Z');
 
     const view = buildDashboardView({
       repository,
@@ -91,6 +93,11 @@ describe('buildDashboardView', () => {
     expect(view.stats.excludedCount).toBe(1);
     expect(view.stats.sourceIssueCount).toBe(1);
     expect(view.stats.lastCollectedAt).toBe('2026-05-09T10:00:02.000Z');
+    expect(view.notificationStatus).toEqual({
+      totalSent: 2,
+      channelCount: 2,
+      lastSentAt: '2026-05-09T10:06:00.000Z',
+    });
     expect(view.profile?.birthYear).toBe(1995);
     expect(view.actionableNotices.map((notice) => notice.eligibility.label)).toEqual([
       '지원가능성 높음',

@@ -178,6 +178,11 @@ const view: DashboardView = {
       message: null,
     },
   ],
+  notificationStatus: {
+    totalSent: 2,
+    channelCount: 1,
+    lastSentAt: '2026-05-09T10:05:00.000Z',
+  },
 };
 
 describe('renderDashboardHtml', () => {
@@ -208,6 +213,9 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('수집 상태');
     expect(html).toContain('<strong>1</strong><span>수집 주의</span>');
     expect(html).toContain('<strong>2026-05-09 19:00</strong><span>마지막 수집</span>');
+    expect(html).toContain('<strong>2026-05-09 19:05</strong><span>마지막 알림</span>');
+    expect(html).toContain('<strong>2</strong><span>알림 발송</span>');
+    expect(html).toContain('<strong>1</strong><span>알림 채널</span>');
     expect(html).toContain('<span class="collection-freshness stale">오래됨</span>');
     expect(html).toContain('수집 확인 필요: SH 최근 실패');
     expect(html).toContain('기관별 수집 상태');

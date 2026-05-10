@@ -90,8 +90,21 @@ describe('sqlite repository', () => {
         const repository = createRepository(':memory:');
         expect(repository.hasNotification('daily-summary', 'payload-hash-1')).toBe(false);
         repository.recordNotification('daily-summary', 'payload-hash-1', '2026-05-07T09:00:00.000Z');
+        repository.recordNotification('telegram:123', 'payload-hash-2', '2026-05-07T10:00:00.000Z');
         expect(repository.hasNotification('daily-summary', 'payload-hash-1')).toBe(true);
         expect(repository.hasNotification('daily-summary', 'payload-hash-2')).toBe(false);
+        expect(repository.listNotificationHistory()).toEqual([
+            {
+                channel: 'telegram:123',
+                payloadHash: 'payload-hash-2',
+                sentAt: '2026-05-07T10:00:00.000Z',
+            },
+            {
+                channel: 'daily-summary',
+                payloadHash: 'payload-hash-1',
+                sentAt: '2026-05-07T09:00:00.000Z',
+            },
+        ]);
     });
     it('records source runs including failure messages', () => {
         const repository = createRepository(':memory:');

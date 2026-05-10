@@ -58,6 +58,12 @@ type PersonalProfileRow = {
   interest_tags: string;
 };
 
+type NotificationHistoryRow = {
+  channel: string;
+  payload_hash: string;
+  sent_at: string;
+};
+
 const serializeArray = (value: string[]) => JSON.stringify(value);
 const serializeObject = (value: Record<string, unknown>) => JSON.stringify(value);
 const parseArray = (value: string) => JSON.parse(value) as string[];
@@ -235,6 +241,16 @@ export const createRepository = (filename: string, database = createDatabase(fil
         .prepare('SELECT 1 FROM notification_history WHERE channel = ? AND payload_hash = ?')
         .get(channel, payloadHash) as { 1: number } | undefined;
       return Boolean(row);
+    },
+    listNotificationHistory() {
+      return database
+        .prepare('SELECT channel, payload_hash, sent_at FROM notification_history ORDER BY sent_at DESC, id DESC')
+        .all()
+        .map((row) => ({
+          channel: (row as NotificationHistoryRow).channel,
+          payloadHash: (row as NotificationHistoryRow).payload_hash,
+          sentAt: (row as NotificationHistoryRow).sent_at,
+        }));
     },
     recordSourceRun(run: SourceRun) {
       database

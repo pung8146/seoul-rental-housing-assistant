@@ -107,9 +107,15 @@ const buildSourceStatuses = ({ notices, actionableNotices, excludedNotices, repo
         };
     });
 };
+const buildNotificationStatus = (notificationHistory) => ({
+    totalSent: notificationHistory.length,
+    channelCount: new Set(notificationHistory.map((history) => history.channel)).size,
+    lastSentAt: notificationHistory[0]?.sentAt ?? null,
+});
 export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
     const notices = repository.queryNotices({});
     const sourceRuns = repository.listSourceRuns();
+    const notificationHistory = repository.listNotificationHistory();
     const profile = repository.getPersonalProfile();
     const actionableNotices = [];
     const excludedNotices = [];
@@ -159,5 +165,6 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
             : null,
         sourceStatuses,
         sourceRuns: latestFirst(sourceRuns).slice(0, 10),
+        notificationStatus: buildNotificationStatus(notificationHistory),
     };
 };

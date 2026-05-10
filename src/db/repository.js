@@ -160,6 +160,16 @@ export const createRepository = (filename, database = createDatabase(filename)) 
                 .get(channel, payloadHash);
             return Boolean(row);
         },
+        listNotificationHistory() {
+            return database
+                .prepare('SELECT channel, payload_hash, sent_at FROM notification_history ORDER BY sent_at DESC, id DESC')
+                .all()
+                .map((row) => ({
+                channel: row.channel,
+                payloadHash: row.payload_hash,
+                sentAt: row.sent_at,
+            }));
+        },
         recordSourceRun(run) {
             database
                 .prepare('INSERT INTO source_runs (source, started_at, finished_at, status, message) VALUES (?, ?, ?, ?, ?)')
