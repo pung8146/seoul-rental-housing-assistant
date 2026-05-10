@@ -301,7 +301,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
     }
     .stats {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
       padding: 16px;
     }
@@ -658,6 +658,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
           <div class="stat"><strong>${view.stats.actionableCount}</strong><span>지원 가능</span></div>
           <div class="stat"><strong>${view.stats.excludedCount}</strong><span>제외됨</span></div>
           <div class="stat"><strong>${view.stats.sourceRunCount}</strong><span>수집 기록</span></div>
+          <div class="stat"><strong>${view.stats.sourceIssueCount}</strong><span>수집 주의</span></div>
         </div>
       </section>
       <section>

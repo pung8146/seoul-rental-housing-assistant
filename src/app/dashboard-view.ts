@@ -36,6 +36,7 @@ export type DashboardView = {
     actionableCount: number;
     excludedCount: number;
     sourceRunCount: number;
+    sourceIssueCount: number;
   };
   profile: PersonalProfile | null;
   actionableNotices: DashboardNoticeSummary[];
@@ -180,12 +181,20 @@ export const buildDashboardView = ({
     sortedActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
     sortedActionableNotices[0] ??
     null;
+  const sourceStatuses = buildSourceStatuses({
+    notices,
+    actionableNotices: sortedActionableNotices,
+    excludedNotices,
+    repository,
+    sourceRuns,
+  });
 
   return {
     stats: {
       actionableCount: actionableNotices.length,
       excludedCount: excludedNotices.length,
       sourceRunCount: sourceRuns.length,
+      sourceIssueCount: sourceStatuses.filter((status) => status.runStatus !== 'success').length,
     },
     profile,
     actionableNotices: sortedActionableNotices,
@@ -196,13 +205,7 @@ export const buildDashboardView = ({
           listings: repository.queryListingsByNotice(selectedNotice.source, selectedNotice.sourceId),
         }
       : null,
-    sourceStatuses: buildSourceStatuses({
-      notices,
-      actionableNotices: sortedActionableNotices,
-      excludedNotices,
-      repository,
-      sourceRuns,
-    }),
+    sourceStatuses,
     sourceRuns: latestFirst(sourceRuns).slice(0, 10),
   };
 };

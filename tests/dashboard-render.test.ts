@@ -8,6 +8,7 @@ const view: DashboardView = {
     actionableCount: 1,
     excludedCount: 1,
     sourceRunCount: 1,
+    sourceIssueCount: 1,
   },
   profile: {
     birthYear: 1995,
@@ -167,6 +168,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('지원 가능 공고');
     expect(html).toContain('제외된 글');
     expect(html).toContain('수집 상태');
+    expect(html).toContain('<strong>1</strong><span>수집 주의</span>');
     expect(html).toContain('기관별 수집 상태');
     expect(html).toContain('최근 성공');
     expect(html).toContain('최근 실패');
