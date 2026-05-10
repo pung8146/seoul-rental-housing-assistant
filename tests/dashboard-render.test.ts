@@ -133,6 +133,8 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('지원 가능 공고');
     expect(html).toContain('제외된 글');
     expect(html).toContain('수집 상태');
+    expect(html).toContain('<details class="profile-panel">');
+    expect(html).toContain('<summary class="profile-summary">');
     expect(html).toContain('내 조건');
     expect(html).toContain('name="birthYear"');
     expect(html).toContain('value="1995"');
@@ -140,6 +142,16 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('16형 대학생');
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert(1)</script>');
+  });
+
+  it('opens the profile filter by default when no profile is saved', () => {
+    const html = renderDashboardHtml({
+      ...view,
+      profile: null,
+    });
+
+    expect(html).toContain('<details class="profile-panel" open>');
+    expect(html).toContain('미입력');
   });
 
   it('shows posted dates instead of relative day labels and distinguishes closed notices', () => {

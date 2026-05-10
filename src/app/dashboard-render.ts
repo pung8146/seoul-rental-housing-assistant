@@ -90,48 +90,54 @@ const renderEligibilityReasons = (notice: Pick<DashboardView['actionableNotices'
 const renderProfileForm = (view: DashboardView): string => {
   const profile = view.profile;
   const interestTags = profile?.interestTags.join(', ') ?? '';
+  const openAttribute = profile ? '' : ' open';
 
   return `
     <section>
-      <div class="section-header">
-        <h2>내 조건</h2>
-        <span class="muted">${profile ? '저장됨' : '미입력'}</span>
-      </div>
-      <form class="profile-form" method="post" action="/profile">
-        <label>
-          <span>출생연도</span>
-          <input name="birthYear" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.birthYear ?? null))}" />
-        </label>
-        <label>
-          <span>거주지역</span>
-          <input name="residenceRegion" value="${escapeHtml(formatInputValue(profile?.residenceRegion ?? null))}" placeholder="서울" />
-        </label>
-        <label>
-          <span>가구원수</span>
-          <input name="householdSize" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.householdSize ?? null))}" />
-        </label>
-        <label>
-          <span>월소득</span>
-          <input name="monthlyIncome" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.monthlyIncome ?? null))}" />
-        </label>
-        <label>
-          <span>총자산</span>
-          <input name="totalAssets" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.totalAssets ?? null))}" />
-        </label>
-        <label>
-          <span>자동차가액</span>
-          <input name="vehicleValue" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.vehicleValue ?? null))}" />
-        </label>
-        <label>
-          <span>관심유형</span>
-          <input name="interestTags" value="${escapeHtml(interestTags)}" placeholder="청년, 행복주택" />
-        </label>
-        <label class="checkbox-field">
-          <input type="checkbox" name="isHomeless" value="true" ${profile?.isHomeless ? 'checked' : ''} />
-          <span>무주택</span>
-        </label>
-        <button type="submit">저장</button>
-      </form>
+      <details class="profile-panel"${openAttribute}>
+        <summary class="profile-summary">
+          <span>내 조건</span>
+          <span class="summary-meta">
+            <span class="muted">${profile ? '저장됨' : '미입력'}</span>
+            <span class="summary-chevron" aria-hidden="true"></span>
+          </span>
+        </summary>
+        <form class="profile-form" method="post" action="/profile">
+          <label>
+            <span>출생연도</span>
+            <input name="birthYear" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.birthYear ?? null))}" />
+          </label>
+          <label>
+            <span>거주지역</span>
+            <input name="residenceRegion" value="${escapeHtml(formatInputValue(profile?.residenceRegion ?? null))}" placeholder="서울" />
+          </label>
+          <label>
+            <span>가구원수</span>
+            <input name="householdSize" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.householdSize ?? null))}" />
+          </label>
+          <label>
+            <span>월소득</span>
+            <input name="monthlyIncome" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.monthlyIncome ?? null))}" />
+          </label>
+          <label>
+            <span>총자산</span>
+            <input name="totalAssets" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.totalAssets ?? null))}" />
+          </label>
+          <label>
+            <span>자동차가액</span>
+            <input name="vehicleValue" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.vehicleValue ?? null))}" />
+          </label>
+          <label>
+            <span>관심유형</span>
+            <input name="interestTags" value="${escapeHtml(interestTags)}" placeholder="청년, 행복주택" />
+          </label>
+          <label class="checkbox-field">
+            <input type="checkbox" name="isHomeless" value="true" ${profile?.isHomeless ? 'checked' : ''} />
+            <span>무주택</span>
+          </label>
+          <button type="submit">저장</button>
+        </form>
+      </details>
     </section>
   `;
 };
@@ -340,6 +346,43 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       font-size: 12px;
       line-height: 1.4;
     }
+    .profile-panel { display: grid; }
+    .profile-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 49px;
+      padding: 14px 16px;
+      border-bottom: 1px solid transparent;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 700;
+      list-style: none;
+      user-select: none;
+    }
+    .profile-summary::-webkit-details-marker { display: none; }
+    .profile-summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+    .profile-panel[open] .profile-summary { border-bottom-color: var(--line); }
+    .summary-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .summary-chevron {
+      width: 9px;
+      height: 9px;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      transform: rotate(45deg);
+      transition: transform 140ms ease;
+    }
+    .profile-panel[open] .summary-chevron { transform: rotate(225deg); }
     .profile-form {
       display: grid;
       gap: 10px;
