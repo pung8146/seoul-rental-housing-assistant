@@ -703,6 +703,52 @@ describe('adapter contract', () => {
             },
         });
     });
+    it('extracts SH detail eligibility requirements from visible body text', () => {
+        const notice = {
+            sourceId: '304120',
+            title: '청년안심주택 입주자 모집공고',
+            status: 'posted',
+            region: '서울',
+            postedAt: '2026-05-08',
+            sourceUrl: 'https://www.i-sh.co.kr/main/view.do?seq=304120',
+            metadata: {
+                provider: 'SH',
+                rawIds: { seq: '304120' },
+            },
+            listings: [
+                {
+                    title: '청년안심주택 입주자 모집공고',
+                    region: '서울',
+                    status: 'posted',
+                },
+            ],
+        };
+        const html = `
+      <table>
+        <tr>
+          <td>
+            신청자격: 입주자모집공고일 현재 만 19세 이상 만 39세 이하의 무주택자
+            소득기준: 월평균소득 3,589,957원 이하
+            자산기준: 총자산 34,500만원 이하, 자동차가액 3,708만원 이하
+          </td>
+        </tr>
+      </table>
+    `;
+        expect(parseShNoticeDetailHtml(html, notice)).toMatchObject({
+            metadata: {
+                provider: 'SH',
+                rawIds: { seq: '304120' },
+                eligibilityRequirements: {
+                    minAge: 19,
+                    maxAge: 39,
+                    requiresHomeless: true,
+                    maxMonthlyIncome: 3589957,
+                    maxTotalAssets: 345000000,
+                    maxVehicleValue: 37080000,
+                },
+            },
+        });
+    });
 });
 describe('normalization helpers', () => {
     it('maps raw adapter output into notice and listing arrays', () => {
