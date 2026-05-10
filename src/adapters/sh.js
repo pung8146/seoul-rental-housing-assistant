@@ -1,4 +1,5 @@
 import { isActionableNoticeTitle } from '../domain/actionable.js';
+import { findPrimaryApplicationAttachment } from '../domain/attachments.js';
 import { extractEligibilityRequirementsFromText } from '../domain/requirements.js';
 const SH_PROVIDER = 'SH';
 const SH_NOTICE_LIST_URL = 'https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/list.do?multi_itm_seq=2';
@@ -89,6 +90,7 @@ const extractAttachments = (html) => {
 };
 export const parseShNoticeDetailHtml = (html, notice) => {
     const attachments = extractAttachments(html);
+    const primaryApplicationAttachment = findPrimaryApplicationAttachment(attachments);
     const bodyPreview = stripHtml(html
         .replace(/<a\b[^>]*href=["']#["'][^>]*>\s*\.[a-z0-9]+\s*<\/a>/gi, ' ')
         .replace(/<a\b[^>]*>\s*미리보기\s*<\/a>/gi, ' ')).slice(0, 300);
@@ -98,6 +100,7 @@ export const parseShNoticeDetailHtml = (html, notice) => {
         metadata: {
             ...(notice.metadata ?? {}),
             attachments,
+            ...(primaryApplicationAttachment ? { primaryApplicationAttachment } : {}),
             bodyPreview,
             ...(eligibilityRequirements ? { eligibilityRequirements } : {}),
         },

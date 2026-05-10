@@ -1,5 +1,6 @@
 import type { RawNoticeCandidate, SourceAdapter } from './base.js';
 import { isActionableNoticeTitle } from '../domain/actionable.js';
+import { findPrimaryApplicationAttachment } from '../domain/attachments.js';
 import { extractEligibilityRequirementsFromText } from '../domain/requirements.js';
 
 const SH_PROVIDER = 'SH';
@@ -119,6 +120,7 @@ const extractAttachments = (html: string): Array<{ title: string; url: string }>
 
 export const parseShNoticeDetailHtml = (html: string, notice: RawNoticeCandidate): RawNoticeCandidate => {
   const attachments = extractAttachments(html);
+  const primaryApplicationAttachment = findPrimaryApplicationAttachment(attachments);
   const bodyPreview = stripHtml(
     html
       .replace(/<a\b[^>]*href=["']#["'][^>]*>\s*\.[a-z0-9]+\s*<\/a>/gi, ' ')
@@ -131,6 +133,7 @@ export const parseShNoticeDetailHtml = (html: string, notice: RawNoticeCandidate
     metadata: {
       ...(notice.metadata ?? {}),
       attachments,
+      ...(primaryApplicationAttachment ? { primaryApplicationAttachment } : {}),
       bodyPreview,
       ...(eligibilityRequirements ? { eligibilityRequirements } : {}),
     },

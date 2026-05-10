@@ -40,6 +40,26 @@ describe('assessEligibility', () => {
     });
   });
 
+  it('points to the primary application attachment when parsed requirements are missing', () => {
+    expect(
+      assessEligibility(
+        profile,
+        makeNotice({
+          metadata: {
+            primaryApplicationAttachment: {
+              title: '청년안심주택 입주자 모집공고문.pdf',
+              url: 'https://example.com/notice.pdf',
+            },
+          },
+        }),
+      ),
+    ).toEqual({
+      status: 'review',
+      label: '조건 확인 필요',
+      reasons: ['공고문에서 신청 조건을 찾지 못함', '첨부 확인 필요: 청년안심주택 입주자 모집공고문.pdf'],
+    });
+  });
+
   it('marks likely eligible notices only when parsed requirements pass and profile tags match', () => {
     expect(
       assessEligibility(

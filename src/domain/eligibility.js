@@ -1,3 +1,4 @@
+import { getPrimaryApplicationAttachment } from './attachments.js';
 const TARGET_KEYWORDS = ['청년', '대학생', '신혼', '고령자', '일반'];
 const noticeText = (notice) => [notice.title, ...notice.targetTags].join(' ');
 const matchingInterestTags = (profile, notice) => profile.interestTags.filter((tag) => noticeText(notice).includes(tag));
@@ -33,6 +34,13 @@ const getReferenceYear = (notice) => {
     return Number.isInteger(year) && year > 0 ? year : new Date().getFullYear();
 };
 const hasEligibilityRequirements = (requirements) => Object.values(requirements).some((value) => value != null);
+const missingRequirementReasons = (notice) => {
+    const primaryAttachment = getPrimaryApplicationAttachment(notice.metadata);
+    return [
+        '공고문에서 신청 조건을 찾지 못함',
+        primaryAttachment ? `첨부 확인 필요: ${primaryAttachment.title}` : '첨부 PDF 확인 필요',
+    ];
+};
 const assessParsedRequirements = (profile, notice) => {
     const requirements = getEligibilityRequirements(notice);
     const notTargetReasons = [];
@@ -97,7 +105,7 @@ export const assessEligibility = (profile, notice) => {
         return {
             status: 'review',
             label: '조건 확인 필요',
-            reasons: ['공고문에서 신청 조건을 찾지 못함', '첨부 PDF 확인 필요'],
+            reasons: missingRequirementReasons(notice),
         };
     }
     if (profile.monthlyIncome == null || profile.totalAssets == null || profile.vehicleValue == null) {

@@ -749,6 +749,46 @@ describe('adapter contract', () => {
             },
         });
     });
+    it('marks SH application notice attachments for manual requirement review', () => {
+        const notice = {
+            sourceId: '304121',
+            title: '청년안심주택 입주자 모집공고',
+            status: 'posted',
+            region: '서울',
+            postedAt: '2026-05-08',
+            sourceUrl: 'https://www.i-sh.co.kr/main/view.do?seq=304121',
+            metadata: {
+                provider: 'SH',
+                rawIds: { seq: '304121' },
+            },
+            listings: [
+                {
+                    title: '청년안심주택 입주자 모집공고',
+                    region: '서울',
+                    status: 'posted',
+                },
+            ],
+        };
+        const html = `
+      <table>
+        <tr>
+          <th>첨부</th>
+          <td>
+            <a href="/files/notice.pdf">청년안심주택 입주자 모집공고문.pdf</a>
+            <a href="/files/result.xlsx">단지별 경쟁률.xlsx</a>
+          </td>
+        </tr>
+      </table>
+    `;
+        expect(parseShNoticeDetailHtml(html, notice)).toMatchObject({
+            metadata: {
+                primaryApplicationAttachment: {
+                    title: '청년안심주택 입주자 모집공고문.pdf',
+                    url: 'https://www.i-sh.co.kr/files/notice.pdf',
+                },
+            },
+        });
+    });
 });
 describe('normalization helpers', () => {
     it('maps raw adapter output into notice and listing arrays', () => {

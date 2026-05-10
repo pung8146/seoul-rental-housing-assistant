@@ -1,3 +1,4 @@
+import { getPrimaryApplicationAttachment } from './attachments.js';
 import type { Notice, PersonalProfile } from '../types.js';
 
 export type EligibilityStatus = 'likely' | 'review' | 'not_target' | 'financial_review' | 'missing_profile';
@@ -63,6 +64,14 @@ const getReferenceYear = (notice: Notice): number => {
 
 const hasEligibilityRequirements = (requirements: EligibilityRequirements): boolean =>
   Object.values(requirements).some((value) => value != null);
+
+const missingRequirementReasons = (notice: Notice): string[] => {
+  const primaryAttachment = getPrimaryApplicationAttachment(notice.metadata);
+  return [
+    '공고문에서 신청 조건을 찾지 못함',
+    primaryAttachment ? `첨부 확인 필요: ${primaryAttachment.title}` : '첨부 PDF 확인 필요',
+  ];
+};
 
 const assessParsedRequirements = (
   profile: PersonalProfile,
@@ -140,7 +149,7 @@ export const assessEligibility = (
     return {
       status: 'review',
       label: '조건 확인 필요',
-      reasons: ['공고문에서 신청 조건을 찾지 못함', '첨부 PDF 확인 필요'],
+      reasons: missingRequirementReasons(notice),
     };
   }
 
