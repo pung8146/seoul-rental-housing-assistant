@@ -41,6 +41,33 @@ const view = {
             },
         },
     ],
+    noticeGroups: {
+        high: [
+            {
+                source: 'lh',
+                sourceId: 'notice-1',
+                noticeKey: 'lh:notice-1',
+                title: '서울 청년 임대주택 입주자 모집공고',
+                stableKey: 'notice:1',
+                changeHash: 'hash',
+                status: '공고중',
+                region: '서울',
+                targetTags: ['청년'],
+                postedAt: '2026-05-09',
+                applicationStartAt: null,
+                applicationEndAt: '2026-05-20',
+                sourceUrl: 'https://example.com/notice',
+                metadata: {},
+                eligibility: {
+                    status: 'likely',
+                    label: '지원가능성 높음',
+                    reasons: ['관심 유형 일치'],
+                },
+            },
+        ],
+        review: [],
+        low: [],
+    },
     excludedNotices: [
         {
             source: 'sh',
@@ -159,9 +186,19 @@ describe('renderDashboardHtml', () => {
                     title: '<script>alert(1)</script> 입주자 모집공고',
                 },
             ],
+            noticeGroups: {
+                ...view.noticeGroups,
+                high: [
+                    {
+                        ...view.noticeGroups.high[0],
+                        title: '<script>alert(1)</script> 입주자 모집공고',
+                    },
+                ],
+            },
         });
         expect(html).toContain('관리 대시보드');
         expect(html).toContain('지원 가능 공고');
+        expect(html).toContain('바로 볼 공고');
         expect(html).toContain('제외된 글');
         expect(html).toContain('수집 상태');
         expect(html).toContain('<strong>1</strong><span>수집 주의</span>');
@@ -221,6 +258,18 @@ describe('renderDashboardHtml', () => {
                     applicationEndAt: '2020-01-01',
                 },
             ],
+            noticeGroups: {
+                high: [],
+                review: [],
+                low: [
+                    {
+                        ...view.actionableNotices[0],
+                        title: '서울가좌 행복주택 예비입주자 모집공고(2026.05.07) 1일전',
+                        postedAt: '2026-05-08',
+                        applicationEndAt: '2020-01-01',
+                    },
+                ],
+            },
             selectedNotice: {
                 notice: {
                     ...view.selectedNotice.notice,
@@ -279,6 +328,45 @@ describe('renderDashboardHtml', () => {
                     applicationEndAt: null,
                 },
             ],
+            noticeGroups: {
+                high: [
+                    {
+                        ...view.actionableNotices[0],
+                        title: '신청 가능한 공고 입주자 모집공고',
+                        applicationStartAt: '2020-01-01',
+                        applicationEndAt: '2999-01-01',
+                    },
+                ],
+                review: [
+                    {
+                        ...view.actionableNotices[0],
+                        sourceId: 'notice-2',
+                        noticeKey: 'lh:notice-2',
+                        title: '접수 예정 공고 입주자 모집공고',
+                        applicationStartAt: '2999-01-01',
+                        applicationEndAt: '2999-02-01',
+                    },
+                    {
+                        ...view.actionableNotices[0],
+                        sourceId: 'notice-3',
+                        noticeKey: 'lh:notice-3',
+                        title: '날짜 부족 공고 입주자 모집공고',
+                        status: '공고중',
+                        applicationStartAt: null,
+                        applicationEndAt: null,
+                    },
+                    {
+                        ...view.actionableNotices[0],
+                        sourceId: 'notice-4',
+                        noticeKey: 'lh:notice-4',
+                        title: '확인 필요한 공고 입주자 모집공고',
+                        status: null,
+                        applicationStartAt: null,
+                        applicationEndAt: null,
+                    },
+                ],
+                low: [],
+            },
         });
         expect(html).toContain('<span class="status-badge available">신청가능</span>');
         expect(html).toContain('<span class="status-badge upcoming">접수예정</span>');

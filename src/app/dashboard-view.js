@@ -21,6 +21,41 @@ const safestFirst = (notices) => [...notices].sort((left, right) => {
     }
     return (right.postedAt ?? '').localeCompare(left.postedAt ?? '');
 });
+const getKoreaToday = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        day: '2-digit',
+        month: '2-digit',
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+    }).formatToParts(new Date());
+    const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+    return `${year}-${month}-${day}`;
+};
+const isClosedNotice = (notice) => {
+    if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
+        return true;
+    }
+    return Boolean(notice.applicationEndAt && notice.applicationEndAt < getKoreaToday());
+};
+const getNoticePriority = (notice) => {
+    if (isClosedNotice(notice) || notice.eligibility.status === 'not_target') {
+        return 'low';
+    }
+    return notice.eligibility.status === 'likely' ? 'high' : 'review';
+};
+const groupNoticesByPriority = (notices) => {
+    const groups = {
+        high: [],
+        review: [],
+        low: [],
+    };
+    for (const notice of notices) {
+        groups[getNoticePriority(notice)].push(notice);
+    }
+    return groups;
+};
 const hasParsedConditions = (notice) => {
     const requirements = notice.metadata.eligibilityRequirements;
     return Boolean(requirements && typeof requirements === 'object' && !Array.isArray(requirements));
@@ -92,6 +127,7 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
         }
     }
     const sortedActionableNotices = safestFirst(actionableNotices);
+    const noticeGroups = groupNoticesByPriority(sortedActionableNotices);
     const selectedNotice = sortedActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
         sortedActionableNotices[0] ??
         null;
@@ -113,6 +149,7 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
         },
         profile,
         actionableNotices: sortedActionableNotices,
+        noticeGroups,
         excludedNotices,
         selectedNotice: selectedNotice
             ? {

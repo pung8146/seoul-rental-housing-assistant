@@ -230,6 +230,27 @@ const renderNoticeRow = (notice, selectedKey) => `
     ${renderEligibilityReasons(notice)}
   </a>
 `;
+const NOTICE_GROUP_LABELS = {
+    high: '바로 볼 공고',
+    review: '확인 필요한 공고',
+    low: '낮은 우선순위',
+};
+const renderNoticeGroup = (key, notices, selectedKey) => {
+    if (notices.length === 0) {
+        return '';
+    }
+    return `
+    <div class="notice-group ${key}">
+      <div class="notice-group-header">
+        <strong>${NOTICE_GROUP_LABELS[key]}</strong>
+        <span>${notices.length}건</span>
+      </div>
+      <div class="notice-list">
+        ${notices.map((notice) => renderNoticeRow(notice, selectedKey)).join('')}
+      </div>
+    </div>
+  `;
+};
 const renderListing = (listing) => `
   <tr>
     <td>${escapeHtml(cleanRelativeAge(listing.title))}</td>
@@ -549,6 +570,35 @@ export const renderDashboardHtml = (view) => {
     }
     .profile-form button:hover { background: #1d4ed8; }
     .notice-list { display: grid; }
+    .notice-groups { display: grid; }
+    .notice-group {
+      display: grid;
+      border-bottom: 1px solid var(--line);
+    }
+    .notice-group:last-child { border-bottom: 0; }
+    .notice-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 16px;
+      background: #fbfcfe;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .notice-group-header strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+    .notice-group.high .notice-group-header {
+      background: #f0fdf4;
+    }
+    .notice-group.review .notice-group-header {
+      background: #fffbeb;
+    }
+    .notice-group.low .notice-group-header {
+      background: #fff1f2;
+    }
     .notice-row {
       display: grid;
       gap: 5px;
@@ -744,8 +794,10 @@ export const renderDashboardHtml = (view) => {
           <h2>지원 가능 공고</h2>
           <span class="muted">${view.stats.actionableCount}건</span>
         </div>
-        <div class="notice-list">
-          ${view.actionableNotices.map((notice) => renderNoticeRow(notice, selectedKey)).join('') || '<div class="detail muted">표시할 공고가 없습니다.</div>'}
+        <div class="notice-groups">
+          ${['high', 'review', 'low']
+        .map((key) => renderNoticeGroup(key, view.noticeGroups[key], selectedKey))
+        .join('') || '<div class="detail muted">표시할 공고가 없습니다.</div>'}
         </div>
       </section>
       <section>

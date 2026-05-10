@@ -98,6 +98,9 @@ describe('buildDashboardView', () => {
     ]);
     expect(view.actionableNotices[0]?.title).toBe(likelyNotice.title);
     expect(view.actionableNotices[0]?.eligibility.label).toBe('지원가능성 높음');
+    expect(view.noticeGroups.high.map((notice) => notice.title)).toEqual([likelyNotice.title]);
+    expect(view.noticeGroups.review.map((notice) => notice.title)).toEqual([reviewNotice.title]);
+    expect(view.noticeGroups.low).toEqual([]);
     expect(view.excludedNotices[0]).toMatchObject({
       title: excluded.title,
       exclusionReason: 'service_notice',

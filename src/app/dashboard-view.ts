@@ -8,6 +8,10 @@ export type DashboardNoticeSummary = Notice & {
   eligibility: EligibilityAssessment;
 };
 
+export type DashboardNoticePriority = 'high' | 'review' | 'low';
+
+export type DashboardNoticeGroups = Record<DashboardNoticePriority, DashboardNoticeSummary[]>;
+
 export type ExcludedDashboardNotice = DashboardNoticeSummary & {
   exclusionReason: NoticeExclusionReason;
 };
@@ -41,6 +45,7 @@ export type DashboardView = {
   };
   profile: PersonalProfile | null;
   actionableNotices: DashboardNoticeSummary[];
+  noticeGroups: DashboardNoticeGroups;
   excludedNotices: ExcludedDashboardNotice[];
   selectedNotice: SelectedDashboardNotice | null;
   sourceStatuses: SourceCollectionStatus[];
@@ -81,6 +86,49 @@ const safestFirst = (notices: DashboardNoticeSummary[]): DashboardNoticeSummary[
 
     return (right.postedAt ?? '').localeCompare(left.postedAt ?? '');
   });
+
+const getKoreaToday = (): string => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+  const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+  const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+  return `${year}-${month}-${day}`;
+};
+
+const isClosedNotice = (notice: Notice): boolean => {
+  if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
+    return true;
+  }
+
+  return Boolean(notice.applicationEndAt && notice.applicationEndAt < getKoreaToday());
+};
+
+const getNoticePriority = (notice: DashboardNoticeSummary): DashboardNoticePriority => {
+  if (isClosedNotice(notice) || notice.eligibility.status === 'not_target') {
+    return 'low';
+  }
+
+  return notice.eligibility.status === 'likely' ? 'high' : 'review';
+};
+
+const groupNoticesByPriority = (notices: DashboardNoticeSummary[]): DashboardNoticeGroups => {
+  const groups: DashboardNoticeGroups = {
+    high: [],
+    review: [],
+    low: [],
+  };
+
+  for (const notice of notices) {
+    groups[getNoticePriority(notice)].push(notice);
+  }
+
+  return groups;
+};
 
 const hasParsedConditions = (notice: Notice): boolean => {
   const requirements = notice.metadata.eligibilityRequirements;
@@ -178,6 +226,7 @@ export const buildDashboardView = ({
   }
 
   const sortedActionableNotices = safestFirst(actionableNotices);
+  const noticeGroups = groupNoticesByPriority(sortedActionableNotices);
   const selectedNotice =
     sortedActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
     sortedActionableNotices[0] ??
@@ -201,6 +250,7 @@ export const buildDashboardView = ({
     },
     profile,
     actionableNotices: sortedActionableNotices,
+    noticeGroups,
     excludedNotices,
     selectedNotice: selectedNotice
       ? {
