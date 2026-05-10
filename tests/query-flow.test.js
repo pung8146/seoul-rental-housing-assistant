@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runQuery, runQueryText } from '../src/app/run-query.js';
 import { createRepository } from '../src/db/repository.js';
+import { getNoticeExclusionReason } from '../src/domain/actionable.js';
 const makeNotice = (index, overrides = {}) => ({
     source: index % 2 === 0 ? 'sh' : 'lh',
     sourceId: `notice-${index}`,
@@ -105,6 +106,11 @@ describe('runQuery', () => {
         expect(result.text).not.toContain('당첨자 명단');
         expect(result.text).not.toContain('청약접수 결과');
         expect(result.text).not.toContain('예비당첨자');
+        expect(getNoticeExclusionReason({ title: '전산작업에 따른 서비스(신한인증서) 이용 안내' })).toBe('service_notice');
+        expect(getNoticeExclusionReason({
+            title: '2025년 전세형 매입임대주택 입주자 모집공고(2025.12.26.) 예비1차 당첨자 명단 및 계약안내',
+        })).toBe('application_result');
+        expect(getNoticeExclusionReason({ title: '[서울지역본부] 집주인 임대주택 예비입주자 모집공고(건설개량형)' })).toBeNull();
     });
     it('returns a readable empty message when list filters match nothing', () => {
         const repository = createRepository(':memory:');
