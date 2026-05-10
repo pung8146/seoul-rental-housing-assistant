@@ -172,8 +172,11 @@ describe('renderDashboardHtml', () => {
         expect(html).toContain('최근 성공');
         expect(html).toContain('최근 실패');
         expect(html).toContain('<td><span class="collect-badge success">성공</span></td>');
+        expect(html).toContain('<td>2026-05-09 19:00</td>');
+        expect(html).not.toContain('<td>2026-05-09T10:00:02.000Z</td>');
         expect(html).toContain('class="source-status success"');
         expect(html).toContain('class="source-status failure"');
+        expect(html).toContain('<div class="source-status-time">2026-05-09 19:00</div>');
         expect(html).toContain('전체 1건');
         expect(html).toContain('조건 1건');
         expect(html).toContain('첨부 1건');

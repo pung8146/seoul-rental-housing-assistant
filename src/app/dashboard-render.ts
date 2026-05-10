@@ -266,7 +266,7 @@ const renderSourceRun = (run: SourceRun): string => `
   <tr>
     <td>${escapeHtml(run.source.toUpperCase())}</td>
     <td><span class="collect-badge ${escapeHtml(run.status)}">${escapeHtml(sourceRunStatusLabel(run.status))}</span></td>
-    <td>${escapeHtml(run.finishedAt)}</td>
+    <td>${escapeHtml(formatKoreaDateTime(run.finishedAt))}</td>
     <td>${escapeHtml(run.message ?? '-')}</td>
   </tr>
 `;
@@ -280,7 +280,9 @@ const renderSourceStatus = (status: DashboardView['sourceStatuses'][number]): st
       <strong>${escapeHtml(status.source.toUpperCase())}</strong>
       ${renderSourceStatusBadge(status)}
     </div>
-    <div class="source-status-time">${escapeHtml(status.lastFinishedAt ?? '수집 기록 없음')}</div>
+    <div class="source-status-time">${escapeHtml(
+      status.lastFinishedAt ? formatKoreaDateTime(status.lastFinishedAt) : '수집 기록 없음',
+    )}</div>
     <div class="source-metrics">
       <span>전체 ${status.totalNotices}건</span>
       <span>지원 후보 ${status.actionableNotices}건</span>
