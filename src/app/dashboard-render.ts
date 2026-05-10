@@ -20,6 +20,28 @@ const formatMoney = (value: number | null): string =>
 
 const formatDate = (value: string | null): string => value ?? '-';
 
+const formatDday = (value: string | null): string => {
+  if (!value) {
+    return '확인필요';
+  }
+
+  const today = new Date(`${getKoreaToday()}T00:00:00+09:00`);
+  const target = new Date(`${value}T00:00:00+09:00`);
+  if (Number.isNaN(target.getTime())) {
+    return '확인필요';
+  }
+
+  const dayInMilliseconds = 24 * 60 * 60 * 1000;
+  const diff = Math.ceil((target.getTime() - today.getTime()) / dayInMilliseconds);
+  if (diff < 0) {
+    return '마감됨';
+  }
+  if (diff === 0) {
+    return 'D-day';
+  }
+  return `D-${diff}`;
+};
+
 const formatKoreaDateTime = (value: string | null): string => {
   if (!value) {
     return '-';
@@ -295,6 +317,106 @@ const renderDetailQuality = (
         )
         .join('')}
     </div>
+  `;
+};
+
+type PreparationStatus = 'ready' | 'review' | 'missing';
+
+type PreparationItem = {
+  label: string;
+  status: PreparationStatus;
+  value: string;
+};
+
+const preparationStatusLabel = (status: PreparationStatus): string => {
+  if (status === 'ready') {
+    return '준비됨';
+  }
+  if (status === 'review') {
+    return '확인필요';
+  }
+  return '부족';
+};
+
+const renderPreparationChecklist = (
+  notice: Notice,
+  listings: Listing[],
+  attachments: Attachment[],
+): string => {
+  const items: PreparationItem[] = [
+    {
+      label: '신청 링크',
+      status: notice.sourceUrl ? 'ready' : 'missing',
+      value: notice.sourceUrl ? '원문 연결됨' : '링크 없음',
+    },
+    {
+      label: '신청기간',
+      status: notice.applicationStartAt && notice.applicationEndAt ? 'ready' : 'review',
+      value: notice.applicationStartAt && notice.applicationEndAt ? '확인됨' : '확인필요',
+    },
+    {
+      label: '신청조건',
+      status: hasEligibilityRequirements(notice) ? 'ready' : 'review',
+      value: hasEligibilityRequirements(notice) ? '추출됨' : '확인필요',
+    },
+    {
+      label: '공고문',
+      status: getPrimaryApplicationAttachment(notice.metadata) ? 'ready' : attachments.length > 0 ? 'review' : 'missing',
+      value: getPrimaryApplicationAttachment(notice.metadata) ? '대표 첨부 있음' : attachments.length > 0 ? '첨부 확인' : '첨부 없음',
+    },
+    {
+      label: '매물정보',
+      status: listings.length > 0 ? 'ready' : 'review',
+      value: listings.length > 0 ? `${listings.length}건` : '확인필요',
+    },
+  ];
+
+  return `
+    <div class="preparation-checklist">
+      ${items
+        .map(
+          (item) => `
+            <div class="preparation-item ${item.status}">
+              <span>${escapeHtml(item.label)}</span>
+              <strong>${escapeHtml(item.value)}</strong>
+              <em>${escapeHtml(preparationStatusLabel(item.status))}</em>
+            </div>
+          `,
+        )
+        .join('')}
+    </div>
+  `;
+};
+
+const renderApplicationPreparation = (
+  notice: Notice,
+  listings: Listing[],
+  attachments: Attachment[],
+): string => {
+  const primaryAttachment = getPrimaryApplicationAttachment(notice.metadata);
+
+  return `
+    <section class="application-prep">
+      <div class="application-prep-header">
+        <div>
+          <h3>신청 준비</h3>
+          <p>자동 신청 전에 직접 확인해야 할 항목입니다.</p>
+        </div>
+        <div class="dday">${escapeHtml(formatDday(notice.applicationEndAt))}</div>
+      </div>
+      <div class="application-prep-actions">
+        ${notice.sourceUrl ? `<a class="source-link" href="${escapeHtml(notice.sourceUrl)}">신청 링크</a>` : '<span class="muted">신청 링크 없음</span>'}
+        ${primaryAttachment ? `<a class="source-link" href="${escapeHtml(primaryAttachment.url)}">공고문 확인</a>` : '<span class="muted">대표 공고문 없음</span>'}
+      </div>
+      <div class="application-prep-status">
+        <div><span>신청상태</span>${renderStatusBadge(notice)}</div>
+        <div><span>마감</span><strong>${escapeHtml(formatDate(notice.applicationEndAt))}</strong></div>
+      </div>
+      <div>
+        <h3>필요 확인 항목</h3>
+        ${renderPreparationChecklist(notice, listings, attachments)}
+      </div>
+    </section>
   `;
 };
 
@@ -755,6 +877,110 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       border-color: #fecaca;
       background: #fff1f2;
     }
+    .application-prep {
+      display: grid;
+      gap: 12px;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f8fbff;
+    }
+    .application-prep-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .application-prep-header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .dday {
+      border: 1px solid #93c5fd;
+      border-radius: 999px;
+      padding: 4px 10px;
+      color: #1e40af;
+      background: #dbeafe;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .application-prep-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .application-prep-status {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .application-prep-status > div {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #ffffff;
+    }
+    .application-prep-status span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .preparation-checklist {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .preparation-item {
+      display: grid;
+      gap: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px;
+      background: #ffffff;
+      min-width: 0;
+    }
+    .preparation-item span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .preparation-item strong {
+      font-size: 13px;
+    }
+    .preparation-item em {
+      width: fit-content;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-style: normal;
+      font-weight: 800;
+    }
+    .preparation-item.ready {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+    .preparation-item.ready em {
+      color: #166534;
+      background: #dcfce7;
+    }
+    .preparation-item.review {
+      border-color: #fde68a;
+      background: #fffbeb;
+    }
+    .preparation-item.review em {
+      color: #854d0e;
+      background: #fef9c3;
+    }
+    .preparation-item.missing {
+      border-color: #fecaca;
+      background: #fff1f2;
+    }
+    .preparation-item.missing em {
+      color: #991b1b;
+      background: #fee2e2;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -877,7 +1103,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
     }
     @media (max-width: 900px) {
       main { grid-template-columns: 1fr; }
-      .detail-grid, .detail-quality, .stats { grid-template-columns: 1fr; }
+      .application-prep-status, .detail-grid, .detail-quality, .preparation-checklist, .stats { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -954,6 +1180,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
                   <div class="field"><span>지원가능성</span>${renderEligibilityBadge(selectedNotice)}${renderEligibilityReasons(selectedNotice)}</div>
                 </div>
                 ${renderDetailQuality(selectedNotice, view.selectedNotice?.listings ?? [], attachments)}
+                ${renderApplicationPreparation(selectedNotice, view.selectedNotice?.listings ?? [], attachments)}
                 <div class="attachments">
                   ${attachments.map((attachment) => `<a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>`).join('')}
                 </div>

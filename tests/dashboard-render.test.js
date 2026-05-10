@@ -243,6 +243,17 @@ describe('renderDashboardHtml', () => {
         expect(html).toContain('<strong>확인필요</strong>');
         expect(html).toContain('<span>매물정보</span>');
         expect(html).toContain('<strong>1건</strong>');
+        expect(html).toContain('신청 준비');
+        expect(html).toContain('자동 신청 전에 직접 확인해야 할 항목입니다.');
+        expect(html).toContain('<div class="dday">D-9</div>');
+        expect(html).toContain('신청 링크');
+        expect(html).toContain('공고문 확인');
+        expect(html).toContain('필요 확인 항목');
+        expect(html).toContain('<span>신청조건</span>');
+        expect(html).toContain('<strong>확인필요</strong>');
+        expect(html).toContain('<em>확인필요</em>');
+        expect(html).toContain('<span>신청 링크</span>');
+        expect(html).toContain('<strong>원문 연결됨</strong>');
         expect(html).toContain('16형 대학생');
         expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
         expect(html).not.toContain('<script>alert(1)</script>');
