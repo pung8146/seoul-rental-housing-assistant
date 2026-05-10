@@ -32,6 +32,14 @@ const decodeHtmlEntities = (value: string): string => value.replace(/&amp;/gi, '
 
 const normalizeShDate = (value: string): string => value.replace(/\./g, '-');
 
+const DATE_TEXT_PATTERN = /(\d{4})\s*(?:년|[-.])\s*(\d{1,2})\s*(?:월|[-.])\s*(\d{1,2})\s*일?/g;
+
+const normalizeDateMatch = (match: RegExpMatchArray): string =>
+  `${match[1]}-${(match[2] ?? '').padStart(2, '0')}-${(match[3] ?? '').padStart(2, '0')}`;
+
+const extractDates = (text: string): string[] =>
+  Array.from(text.matchAll(DATE_TEXT_PATTERN)).map((match) => normalizeDateMatch(match));
+
 const extractTitle = (rowHtml: string): string => {
   const anchorMatch = rowHtml.match(/<a\b[^>]*onclick=["'][^"']*getDetailView\(['"][^'"]+['"]\)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
   return anchorMatch?.[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
@@ -123,16 +131,15 @@ const extractAttachments = (html: string): Array<{ title: string; url: string }>
 
 const extractApplicationPeriod = (html: string): { applicationStartAt?: string; applicationEndAt?: string } => {
   const text = stripHtml(html);
-  const match = text.match(
-    /(?:신청접수기간|신청기간|접수기간)\s*:?\s*(\d{4}[-.]\d{2}[-.]\d{2})[\s\S]{0,40}?~[\s\S]{0,40}?(\d{4}[-.]\d{2}[-.]\d{2})/,
-  );
-  if (!match) {
+  const scopedText = text.match(/(?:신청접수기간|신청기간|접수기간|청약접수)[\s\S]{0,140}/)?.[0] ?? text;
+  const dates = extractDates(scopedText);
+  if (dates.length < 2) {
     return {};
   }
 
   return {
-    applicationStartAt: normalizeShDate(match[1] ?? ''),
-    applicationEndAt: normalizeShDate(match[2] ?? ''),
+    applicationStartAt: dates[0],
+    applicationEndAt: dates[1],
   };
 };
 

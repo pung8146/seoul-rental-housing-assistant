@@ -424,6 +424,34 @@ describe('adapter contract', () => {
             applicationEndAt: '2026-05-21',
         });
     });
+    it('extracts LH detail application periods written with Korean date units', () => {
+        const notice = {
+            sourceId: '2015122300019922',
+            title: '서울 행복주택 입주자 모집공고',
+            status: '공고중',
+            region: '서울',
+            postedAt: '2026-05-08',
+            sourceUrl: 'https://apply.lh.or.kr/detail',
+            metadata: {
+                provider: 'LH',
+                rawIds: { dataId1: '2015122300019922' },
+            },
+            listings: [],
+        };
+        const html = `
+      <section>
+        <h3>공급일정</h3>
+        <p>청약접수는 2026년 5월 15일 10:00부터 2026년 5월 21일 17:00까지입니다.</p>
+      </section>
+    `;
+        expect(parseLhNoticeDetailHtml(html, notice)).toMatchObject({
+            applicationStartAt: '2026-05-15',
+            applicationEndAt: '2026-05-21',
+            metadata: {
+                bodyPreview: expect.stringContaining('청약접수'),
+            },
+        });
+    });
     it('extracts LH detail eligibility requirements for downstream profile matching', () => {
         const notice = {
             sourceId: '2015122300019917',
@@ -932,6 +960,31 @@ describe('adapter contract', () => {
       <section>
         <h3>인터넷 청약 일정</h3>
         <p>신청기간 : 2026.05.15(금) 10:00부터 ~ 2026.05.21(목) 17:00까지</p>
+      </section>
+    `;
+        expect(parseShNoticeDetailHtml(html, notice)).toMatchObject({
+            applicationStartAt: '2026-05-15',
+            applicationEndAt: '2026-05-21',
+        });
+    });
+    it('extracts SH detail application periods written with Korean date units', () => {
+        const notice = {
+            sourceId: '304124',
+            title: '청년안심주택 입주자 모집공고',
+            status: 'posted',
+            region: '서울',
+            postedAt: '2026-05-08',
+            sourceUrl: 'https://www.i-sh.co.kr/main/view.do?seq=304124',
+            metadata: {
+                provider: 'SH',
+                rawIds: { seq: '304124' },
+            },
+            listings: [],
+        };
+        const html = `
+      <section>
+        <h3>인터넷 청약 일정</h3>
+        <p>접수기간: 2026년 5월 15일 오전 10시부터 2026년 5월 21일 오후 5시까지</p>
       </section>
     `;
         expect(parseShNoticeDetailHtml(html, notice)).toMatchObject({

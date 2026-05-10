@@ -66,20 +66,29 @@ const normalizeNoticeTitle = (value: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const DATE_TEXT_PATTERN = /(\d{4})\s*(?:년|[-.])\s*(\d{1,2})\s*(?:월|[-.])\s*(\d{1,2})\s*일?/g;
+
 const isDateCell = (value: string): boolean => /^\d{4}[-.]\d{2}[-.]\d{2}$/.test(value);
 
 const normalizeLhDate = (value: string): string => value.replace(/\./g, '-');
 
+const normalizeDateMatch = (match: RegExpMatchArray): string =>
+  `${match[1]}-${(match[2] ?? '').padStart(2, '0')}-${(match[3] ?? '').padStart(2, '0')}`;
+
+const extractDates = (text: string): string[] =>
+  Array.from(text.matchAll(DATE_TEXT_PATTERN)).map((match) => normalizeDateMatch(match));
+
 const extractApplicationPeriod = (html: string): { applicationStartAt?: string; applicationEndAt?: string } => {
   const text = stripHtml(html);
-  const match = text.match(/접수기간\s*:?\s*(\d{4}[-.]\d{2}[-.]\d{2})[\s\S]{0,40}?~[\s\S]{0,40}?(\d{4}[-.]\d{2}[-.]\d{2})/);
-  if (!match) {
+  const scopedText = text.match(/(?:신청접수기간|신청기간|접수기간|청약접수)[\s\S]{0,140}/)?.[0] ?? text;
+  const dates = extractDates(scopedText);
+  if (dates.length < 2) {
     return {};
   }
 
   return {
-    applicationStartAt: normalizeLhDate(match[1] ?? ''),
-    applicationEndAt: normalizeLhDate(match[2] ?? ''),
+    applicationStartAt: dates[0],
+    applicationEndAt: dates[1],
   };
 };
 
@@ -218,6 +227,7 @@ export const parseLhNoticeDetailHtml = (html: string, notice: RawNoticeCandidate
   const eligibilityRequirements = extractEligibilityRequirements(html);
   const attachments = extractAttachments(html);
   const primaryApplicationAttachment = findPrimaryApplicationAttachment(attachments);
+  const bodyPreview = stripHtml(html).slice(0, 300);
   const listings = tables.flatMap((tableMatch, tableIndex) => {
     const tableHtml = tableMatch[0];
     const headers = Array.from(tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))
@@ -268,6 +278,7 @@ export const parseLhNoticeDetailHtml = (html: string, notice: RawNoticeCandidate
       ...(notice.metadata ?? {}),
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(primaryApplicationAttachment ? { primaryApplicationAttachment } : {}),
+      bodyPreview,
       ...(eligibilityRequirements ? { eligibilityRequirements } : {}),
     },
     listings: listings.length > 0 ? listings : notice.listings,
