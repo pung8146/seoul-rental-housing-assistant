@@ -171,6 +171,7 @@ describe('renderDashboardHtml', () => {
         expect(html).toContain('기관별 수집 상태');
         expect(html).toContain('최근 성공');
         expect(html).toContain('최근 실패');
+        expect(html).toContain('<td><span class="collect-badge success">성공</span></td>');
         expect(html).toContain('class="source-status success"');
         expect(html).toContain('class="source-status failure"');
         expect(html).toContain('전체 1건');
@@ -317,5 +318,30 @@ describe('renderDashboardHtml', () => {
             },
         });
         expect(html).toContain('<span class="collection-freshness fresh">최신</span>');
+    });
+    it('renders source run history statuses as Korean badges', () => {
+        const html = renderDashboardHtml({
+            ...view,
+            sourceRuns: [
+                {
+                    source: 'lh',
+                    startedAt: '2026-05-09T10:00:00.000Z',
+                    finishedAt: '2026-05-09T10:00:02.000Z',
+                    status: 'partial',
+                    message: '상세 수집 실패 1건',
+                },
+                {
+                    source: 'sh',
+                    startedAt: '2026-05-09T10:00:00.000Z',
+                    finishedAt: '2026-05-09T10:00:03.000Z',
+                    status: 'failure',
+                    message: 'network timeout',
+                },
+            ],
+        });
+        expect(html).toContain('<td><span class="collect-badge partial">일부 실패</span></td>');
+        expect(html).toContain('<td><span class="collect-badge failure">실패</span></td>');
+        expect(html).not.toContain('<td>partial</td>');
+        expect(html).not.toContain('<td>failure</td>');
     });
 });

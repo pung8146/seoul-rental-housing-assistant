@@ -252,10 +252,20 @@ const renderListing = (listing: Listing): string => `
   </tr>
 `;
 
+const sourceRunStatusLabel = (status: SourceRun['status']): string => {
+  if (status === 'success') {
+    return '성공';
+  }
+  if (status === 'partial') {
+    return '일부 실패';
+  }
+  return '실패';
+};
+
 const renderSourceRun = (run: SourceRun): string => `
   <tr>
     <td>${escapeHtml(run.source.toUpperCase())}</td>
-    <td>${escapeHtml(run.status)}</td>
+    <td><span class="collect-badge ${escapeHtml(run.status)}">${escapeHtml(sourceRunStatusLabel(run.status))}</span></td>
     <td>${escapeHtml(run.finishedAt)}</td>
     <td>${escapeHtml(run.message ?? '-')}</td>
   </tr>
