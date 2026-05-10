@@ -39,6 +39,19 @@ const isDateCell = (value: string): boolean => /^\d{4}[-.]\d{2}[-.]\d{2}$/.test(
 
 const normalizeLhDate = (value: string): string => value.replace(/\./g, '-');
 
+const extractApplicationPeriod = (html: string): { applicationStartAt?: string; applicationEndAt?: string } => {
+  const text = stripHtml(html);
+  const match = text.match(/접수기간\s*:\s*(\d{4}[-.]\d{2}[-.]\d{2})\s*~\s*(\d{4}[-.]\d{2}[-.]\d{2})/);
+  if (!match) {
+    return {};
+  }
+
+  return {
+    applicationStartAt: normalizeLhDate(match[1] ?? ''),
+    applicationEndAt: normalizeLhDate(match[2] ?? ''),
+  };
+};
+
 const compactRawIds = (ids: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(ids).filter(([, value]) => value.length > 0));
 
@@ -141,6 +154,7 @@ const extractDetailBuildings = (html: string): string[] =>
 export const parseLhNoticeDetailHtml = (html: string, notice: RawNoticeCandidate): RawNoticeCandidate => {
   const tables = Array.from(html.matchAll(/<table\b[\s\S]*?<\/table>/gi));
   const buildings = extractDetailBuildings(html);
+  const applicationPeriod = extractApplicationPeriod(html);
   const listings = tables.flatMap((tableMatch, tableIndex) => {
     const tableHtml = tableMatch[0];
     const headers = Array.from(tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))
@@ -186,6 +200,7 @@ export const parseLhNoticeDetailHtml = (html: string, notice: RawNoticeCandidate
 
   return {
     ...notice,
+    ...applicationPeriod,
     listings: listings.length > 0 ? listings : notice.listings,
   };
 };

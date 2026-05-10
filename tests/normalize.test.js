@@ -357,10 +357,16 @@ describe('adapter contract', () => {
           </tr>
         </tbody>
       </table>
+      <section>
+        <h3>공급일정</h3>
+        <p>접수기간 : 2026.05.19 ~ 2026.05.21</p>
+      </section>
     `;
         expect(parseLhNoticeDetailHtml(html, notice)).toMatchObject({
             sourceId: '2015122300019916',
             title: '고령자복지주택 예비입주자 모집',
+            applicationStartAt: '2026-05-19',
+            applicationEndAt: '2026-05-21',
             listings: [
                 {
                     title: '고령자복지주택 예비입주자 모집 26A',
