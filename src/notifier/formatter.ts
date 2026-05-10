@@ -1,4 +1,5 @@
 import type { Listing, NotificationEvent, Notice } from '../types.js';
+import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
 import type { EligibilityAssessment } from '../domain/eligibility.js';
 
 export const formatNoticeSummaryLine = (notice: Notice, index: number, eligibility?: EligibilityAssessment): string => {
@@ -101,6 +102,11 @@ export const formatNoticeDetails = (
 
   if (notice.sourceUrl) {
     lines.push(notice.sourceUrl);
+  }
+
+  const primaryAttachment = getPrimaryApplicationAttachment(notice.metadata);
+  if (primaryAttachment) {
+    lines.push(`확인할 공고문: ${primaryAttachment.title}`, primaryAttachment.url);
   }
 
   listings.forEach((listing, index) => {

@@ -1,4 +1,5 @@
 import type { DashboardView, ExcludedDashboardNotice } from './dashboard-view.js';
+import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
 import type { Listing, Notice, SourceRun } from '../types.js';
 
 type Attachment = {
@@ -165,6 +166,20 @@ const getAttachments = (notice: Notice): Attachment[] => {
       typeof (attachment as Attachment).title === 'string' &&
       typeof (attachment as Attachment).url === 'string',
   );
+};
+
+const renderPrimaryApplicationAttachment = (notice: Notice): string => {
+  const attachment = getPrimaryApplicationAttachment(notice.metadata);
+  if (!attachment) {
+    return '';
+  }
+
+  return `
+    <div class="primary-attachment">
+      <span>확인할 공고문</span>
+      <a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>
+    </div>
+  `;
 };
 
 const renderNoticeRow = (notice: DashboardView['actionableNotices'][number], selectedKey?: string): string => `
@@ -495,10 +510,25 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       background: var(--warn-soft);
     }
     .attachments { display: flex; flex-wrap: wrap; gap: 8px; }
-    .attachments a, .source-link {
+    .attachments a, .source-link, .primary-attachment a {
       color: var(--accent);
       text-decoration: none;
       font-weight: 650;
+    }
+    .primary-attachment {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 10px;
+      background: #eff6ff;
+    }
+    .primary-attachment span {
+      color: #1e40af;
+      font-size: 12px;
+      font-weight: 800;
     }
     .source-status-list {
       display: grid;
@@ -638,6 +668,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
                 <div class="attachments">
                   ${attachments.map((attachment) => `<a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>`).join('')}
                 </div>
+                ${renderPrimaryApplicationAttachment(selectedNotice)}
                 <div class="table-wrap">
                   <table>
                     <thead>

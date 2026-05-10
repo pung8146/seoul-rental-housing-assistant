@@ -1,3 +1,4 @@
+import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
 const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -121,6 +122,18 @@ const getAttachments = (notice) => {
         attachment !== null &&
         typeof attachment.title === 'string' &&
         typeof attachment.url === 'string');
+};
+const renderPrimaryApplicationAttachment = (notice) => {
+    const attachment = getPrimaryApplicationAttachment(notice.metadata);
+    if (!attachment) {
+        return '';
+    }
+    return `
+    <div class="primary-attachment">
+      <span>확인할 공고문</span>
+      <a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>
+    </div>
+  `;
 };
 const renderNoticeRow = (notice, selectedKey) => `
   <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="/?notice=${encodeURIComponent(notice.noticeKey)}">
@@ -439,10 +452,25 @@ export const renderDashboardHtml = (view) => {
       background: var(--warn-soft);
     }
     .attachments { display: flex; flex-wrap: wrap; gap: 8px; }
-    .attachments a, .source-link {
+    .attachments a, .source-link, .primary-attachment a {
       color: var(--accent);
       text-decoration: none;
       font-weight: 650;
+    }
+    .primary-attachment {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 10px;
+      background: #eff6ff;
+    }
+    .primary-attachment span {
+      color: #1e40af;
+      font-size: 12px;
+      font-weight: 800;
     }
     .source-status-list {
       display: grid;
@@ -579,6 +607,7 @@ export const renderDashboardHtml = (view) => {
                 <div class="attachments">
                   ${attachments.map((attachment) => `<a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>`).join('')}
                 </div>
+                ${renderPrimaryApplicationAttachment(selectedNotice)}
                 <div class="table-wrap">
                   <table>
                     <thead>

@@ -1,3 +1,4 @@
+import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
 export const formatNoticeSummaryLine = (notice, index, eligibility) => {
     const details = [notice.region, notice.status].filter((value) => Boolean(value)).join(' · ');
     const prefix = eligibility ? `[${eligibility.label}] ` : '';
@@ -59,6 +60,10 @@ export const formatNoticeDetails = (notice, listings, eligibility) => {
     }
     if (notice.sourceUrl) {
         lines.push(notice.sourceUrl);
+    }
+    const primaryAttachment = getPrimaryApplicationAttachment(notice.metadata);
+    if (primaryAttachment) {
+        lines.push(`확인할 공고문: ${primaryAttachment.title}`, primaryAttachment.url);
     }
     listings.forEach((listing, index) => {
         lines.push(`${index + 1}. ${listing.title}`, `보증금 ${formatCurrency(listing.deposit)} / 월세 ${formatCurrency(listing.monthlyRent)}`);

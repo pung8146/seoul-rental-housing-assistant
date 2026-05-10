@@ -82,7 +82,14 @@ describe('formatDailySummary', () => {
 });
 describe('formatNoticeDetails', () => {
     it('formats expandable notice details separately from the default summary', () => {
-        const details = formatNoticeDetails(makeNotice(), [
+        const details = formatNoticeDetails(makeNotice({
+            metadata: {
+                primaryApplicationAttachment: {
+                    title: '공고문.pdf',
+                    url: 'https://example.com/file.pdf',
+                },
+            },
+        }), [
             makeListing(),
             makeListing({
                 title: '101동 202호',
@@ -93,6 +100,8 @@ describe('formatNoticeDetails', () => {
             }),
         ]);
         expect(details).toContain('서울 청년 임대주택 모집');
+        expect(details).toContain('확인할 공고문: 공고문.pdf');
+        expect(details).toContain('https://example.com/file.pdf');
         expect(details).toContain('1. 101동 201호');
         expect(details).toContain('2. 101동 202호');
         expect(details).toContain('보증금 10,000,000원 / 월세 250,000원');

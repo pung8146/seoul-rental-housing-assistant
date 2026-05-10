@@ -81,7 +81,13 @@ const view: DashboardView = {
       applicationStartAt: null,
       applicationEndAt: '2026-05-20',
       sourceUrl: 'https://example.com/notice',
-      metadata: { attachments: [{ title: '공고문.pdf', url: 'https://example.com/file.pdf' }] },
+      metadata: {
+        attachments: [{ title: '공고문.pdf', url: 'https://example.com/file.pdf' }],
+        primaryApplicationAttachment: {
+          title: '공고문.pdf',
+          url: 'https://example.com/file.pdf',
+        },
+      },
       eligibility: {
         status: 'likely',
         label: '지원가능성 높음',
@@ -168,6 +174,8 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('조건 1건');
     expect(html).toContain('첨부 1건');
     expect(html).toContain('network timeout');
+    expect(html).toContain('확인할 공고문');
+    expect(html).toContain('href="https://example.com/file.pdf"');
     expect(html).toContain('<details class="profile-panel">');
     expect(html).toContain('<summary class="profile-summary">');
     expect(html).toContain('내 조건');
