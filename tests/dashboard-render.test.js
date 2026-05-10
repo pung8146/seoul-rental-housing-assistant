@@ -6,6 +6,16 @@ const view = {
         excludedCount: 1,
         sourceRunCount: 1,
     },
+    profile: {
+        birthYear: 1995,
+        isHomeless: true,
+        residenceRegion: '서울',
+        householdSize: 1,
+        monthlyIncome: 2500000,
+        totalAssets: 50000000,
+        vehicleValue: 0,
+        interestTags: ['청년'],
+    },
     actionableNotices: [
         {
             source: 'lh',
@@ -22,6 +32,11 @@ const view = {
             applicationEndAt: '2026-05-20',
             sourceUrl: 'https://example.com/notice',
             metadata: {},
+            eligibility: {
+                status: 'likely',
+                label: '지원가능성 높음',
+                reasons: ['관심 유형 일치'],
+            },
         },
     ],
     excludedNotices: [
@@ -41,6 +56,11 @@ const view = {
             sourceUrl: 'https://example.com/excluded',
             metadata: {},
             exclusionReason: 'service_notice',
+            eligibility: {
+                status: 'missing_profile',
+                label: '프로필 필요',
+                reasons: ['내 정보가 아직 저장되지 않음'],
+            },
         },
     ],
     selectedNotice: {
@@ -59,6 +79,11 @@ const view = {
             applicationEndAt: '2026-05-20',
             sourceUrl: 'https://example.com/notice',
             metadata: { attachments: [{ title: '공고문.pdf', url: 'https://example.com/file.pdf' }] },
+            eligibility: {
+                status: 'likely',
+                label: '지원가능성 높음',
+                reasons: ['관심 유형 일치'],
+            },
         },
         listings: [
             {
@@ -103,6 +128,10 @@ describe('renderDashboardHtml', () => {
         expect(html).toContain('지원 가능 공고');
         expect(html).toContain('제외된 글');
         expect(html).toContain('수집 상태');
+        expect(html).toContain('내 조건');
+        expect(html).toContain('name="birthYear"');
+        expect(html).toContain('value="1995"');
+        expect(html).toContain('지원가능성 높음');
         expect(html).toContain('16형 대학생');
         expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
         expect(html).not.toContain('<script>alert(1)</script>');

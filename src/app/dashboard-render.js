@@ -6,6 +6,7 @@ const escapeHtml = (value) => String(value ?? '')
     .replace(/'/g, '&#39;');
 const formatMoney = (value) => typeof value === 'number' ? `${value.toLocaleString('ko-KR')}원` : '미정';
 const formatDate = (value) => value ?? '-';
+const formatInputValue = (value) => (value === null ? '' : String(value));
 const getKoreaToday = () => {
     const parts = new Intl.DateTimeFormat('en-CA', {
         day: '2-digit',
@@ -45,6 +46,57 @@ const renderStatusBadge = (notice) => {
     const status = getApplicationStatus(notice);
     return `<span class="status-badge ${status.className}">${status.label}</span>`;
 };
+const renderEligibilityBadge = (notice) => `<span class="eligibility-badge ${notice.eligibility.status}">${escapeHtml(notice.eligibility.label)}</span>`;
+const renderEligibilityReasons = (notice) => notice.eligibility.reasons.length > 0
+    ? `<div class="eligibility-reasons">${notice.eligibility.reasons.map(escapeHtml).join(' · ')}</div>`
+    : '';
+const renderProfileForm = (view) => {
+    const profile = view.profile;
+    const interestTags = profile?.interestTags.join(', ') ?? '';
+    return `
+    <section>
+      <div class="section-header">
+        <h2>내 조건</h2>
+        <span class="muted">${profile ? '저장됨' : '미입력'}</span>
+      </div>
+      <form class="profile-form" method="post" action="/profile">
+        <label>
+          <span>출생연도</span>
+          <input name="birthYear" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.birthYear ?? null))}" />
+        </label>
+        <label>
+          <span>거주지역</span>
+          <input name="residenceRegion" value="${escapeHtml(formatInputValue(profile?.residenceRegion ?? null))}" placeholder="서울" />
+        </label>
+        <label>
+          <span>가구원수</span>
+          <input name="householdSize" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.householdSize ?? null))}" />
+        </label>
+        <label>
+          <span>월소득</span>
+          <input name="monthlyIncome" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.monthlyIncome ?? null))}" />
+        </label>
+        <label>
+          <span>총자산</span>
+          <input name="totalAssets" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.totalAssets ?? null))}" />
+        </label>
+        <label>
+          <span>자동차가액</span>
+          <input name="vehicleValue" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.vehicleValue ?? null))}" />
+        </label>
+        <label>
+          <span>관심유형</span>
+          <input name="interestTags" value="${escapeHtml(interestTags)}" placeholder="청년, 행복주택" />
+        </label>
+        <label class="checkbox-field">
+          <input type="checkbox" name="isHomeless" value="true" ${profile?.isHomeless ? 'checked' : ''} />
+          <span>무주택</span>
+        </label>
+        <button type="submit">저장</button>
+      </form>
+    </section>
+  `;
+};
 const reasonLabel = (notice) => {
     if (notice.exclusionReason === 'service_notice') {
         return '서비스 안내';
@@ -68,7 +120,8 @@ const renderNoticeRow = (notice, selectedKey) => `
   <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="/?notice=${encodeURIComponent(notice.noticeKey)}">
     <span class="notice-title">${escapeHtml(cleanRelativeAge(notice.title))}</span>
     <span class="notice-meta">${escapeHtml(notice.source.toUpperCase())} · ${escapeHtml(notice.region)} · ${escapeHtml(notice.status)} · 등록일 ${escapeHtml(formatDate(notice.postedAt))}</span>
-    ${renderStatusBadge(notice)}
+    <span class="badge-row">${renderStatusBadge(notice)} ${renderEligibilityBadge(notice)}</span>
+    ${renderEligibilityReasons(notice)}
   </a>
 `;
 const renderListing = (listing) => `
@@ -197,6 +250,87 @@ export const renderDashboardHtml = (view) => {
       background: #f1f5f9;
       border: 1px solid #cbd5e1;
     }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .eligibility-badge {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+    }
+    .eligibility-badge.likely {
+      color: #166534;
+      background: #dcfce7;
+      border-color: #86efac;
+    }
+    .eligibility-badge.review, .eligibility-badge.financial_review {
+      color: #854d0e;
+      background: #fef9c3;
+      border-color: #fde047;
+    }
+    .eligibility-badge.not_target {
+      color: #991b1b;
+      background: #fee2e2;
+      border-color: #fecaca;
+    }
+    .eligibility-reasons {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .profile-form {
+      display: grid;
+      gap: 10px;
+      padding: 14px 16px 16px;
+    }
+    .profile-form label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .profile-form input {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 9px;
+      color: var(--text);
+      background: #ffffff;
+      font: inherit;
+    }
+    .profile-form .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .profile-form .checkbox-field input {
+      width: 16px;
+      min-height: 16px;
+    }
+    .profile-form button {
+      min-height: 36px;
+      border: 1px solid #1d4ed8;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #ffffff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .profile-form button:hover { background: #1d4ed8; }
     .notice-list { display: grid; }
     .notice-row {
       display: grid;
@@ -261,6 +395,7 @@ export const renderDashboardHtml = (view) => {
   </header>
   <main>
     <div class="sidebar">
+      ${renderProfileForm(view)}
       <section>
         <div class="section-header">
           <h2>지원 가능 공고</h2>
@@ -310,6 +445,7 @@ export const renderDashboardHtml = (view) => {
                   <div class="field"><span>상태</span>${renderStatusBadge(selectedNotice)} ${escapeHtml(selectedNotice.status)}</div>
                   <div class="field"><span>등록일</span>${escapeHtml(formatDate(selectedNotice.postedAt))}</div>
                   <div class="field"><span>마감</span>${escapeHtml(formatDate(selectedNotice.applicationEndAt))}</div>
+                  <div class="field"><span>지원가능성</span>${renderEligibilityBadge(selectedNotice)}${renderEligibilityReasons(selectedNotice)}</div>
                 </div>
                 <div class="attachments">
                   ${attachments.map((attachment) => `<a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>`).join('')}
