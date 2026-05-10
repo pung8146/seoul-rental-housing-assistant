@@ -40,6 +40,12 @@ const extractAnchorText = (rowHtml) => {
     const anchorMatch = rowHtml.match(/<([a-z]+)\b[^>]*class=["'][^"']*wrtancInfoBtn[^"']*["'][^>]*>([\s\S]*?)<\/\1>/i);
     return anchorMatch?.[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
 };
+const normalizeNoticeTitle = (value) => value
+    .replace(/\s*\d+일전\s*/g, ' ')
+    .replace(/\s*오늘\s*/g, ' ')
+    .replace(/\bNEW\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 const isDateCell = (value) => /^\d{4}[-.]\d{2}[-.]\d{2}$/.test(value);
 const normalizeLhDate = (value) => value.replace(/\./g, '-');
 const extractApplicationPeriod = (html) => {
@@ -116,6 +122,7 @@ export const parseLhNoticeListHtml = (html) => {
             titleCellIndex = cells.findIndex((cell, index) => index > 0 && !isDateCell(cell) && isDateCell(cells[index + 3] ?? ''));
             title = cells[titleCellIndex] ?? title;
         }
+        title = normalizeNoticeTitle(title);
         const postedAtIndex = cells.findIndex((cell, index) => index > titleCellIndex && isDateCell(cell));
         const supplyType = titleCellIndex > 1 ? cells[titleCellIndex - 1] : cells[titleCellIndex + 1] ?? '';
         const regionStartIndex = titleCellIndex > 1 ? titleCellIndex + 1 : titleCellIndex + 2;

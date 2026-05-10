@@ -89,6 +89,8 @@ export const createRepository = (filename, database = createDatabase(filename)) 
       metadata_json = excluded.metadata_json,
       updated_at = CURRENT_TIMESTAMP
   `);
+    const deleteListingsByNoticeStatement = database.prepare('DELETE FROM listings WHERE source = ? AND notice_source_id = ?');
+    const deleteStaleListingsByNoticeStatement = database.prepare('DELETE FROM listings WHERE source = ? AND notice_source_id = ? AND stable_key NOT IN (SELECT value FROM json_each(?))');
     const repository = {
         db: database,
         upsertNotice(notice) {
@@ -124,6 +126,13 @@ export const createRepository = (filename, database = createDatabase(filename)) 
                 status: listing.status,
                 metadata_json: serializeObject(listing.metadata),
             });
+        },
+        deleteStaleListingsByNotice(source, noticeSourceId, stableKeys) {
+            if (stableKeys.length === 0) {
+                deleteListingsByNoticeStatement.run(source, noticeSourceId);
+                return;
+            }
+            deleteStaleListingsByNoticeStatement.run(source, noticeSourceId, JSON.stringify(stableKeys));
         },
         findNoticeBySourceId(source, sourceId) {
             const row = database

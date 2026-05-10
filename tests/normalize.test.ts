@@ -318,7 +318,7 @@ describe('adapter contract', () => {
     expect(parseLhNoticeListHtml(html)).toEqual([
       {
         sourceId: '2015122300019915',
-        title: '김제하동 국민임대주택 모집공고 1일전',
+        title: '김제하동 국민임대주택 모집공고',
         status: '공고중',
         region: '전북',
         postedAt: '2026-05-08',
@@ -336,7 +336,7 @@ describe('adapter contract', () => {
         },
         listings: [
           {
-            title: '김제하동 국민임대주택 모집공고 1일전',
+            title: '김제하동 국민임대주택 모집공고',
             supplyType: '국민임대',
             region: '전북',
             status: '공고중',

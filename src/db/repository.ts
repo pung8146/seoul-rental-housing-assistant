@@ -153,6 +153,12 @@ export const createRepository = (filename: string, database = createDatabase(fil
       metadata_json = excluded.metadata_json,
       updated_at = CURRENT_TIMESTAMP
   `);
+  const deleteListingsByNoticeStatement = database.prepare(
+    'DELETE FROM listings WHERE source = ? AND notice_source_id = ?',
+  );
+  const deleteStaleListingsByNoticeStatement = database.prepare(
+    'DELETE FROM listings WHERE source = ? AND notice_source_id = ? AND stable_key NOT IN (SELECT value FROM json_each(?))',
+  );
 
   const repository = {
     db: database,
@@ -189,6 +195,14 @@ export const createRepository = (filename: string, database = createDatabase(fil
         status: listing.status,
         metadata_json: serializeObject(listing.metadata),
       });
+    },
+    deleteStaleListingsByNotice(source: string, noticeSourceId: string, stableKeys: string[]) {
+      if (stableKeys.length === 0) {
+        deleteListingsByNoticeStatement.run(source, noticeSourceId);
+        return;
+      }
+
+      deleteStaleListingsByNoticeStatement.run(source, noticeSourceId, JSON.stringify(stableKeys));
     },
     findNoticeBySourceId(source: string, sourceId: string) {
       const row = database

@@ -103,6 +103,11 @@ export const runCollect = async ({
         for (const listing of incomingListings) {
           repository.upsertListing(listing);
         }
+        repository.deleteStaleListingsByNotice(
+          notice.source,
+          notice.sourceId,
+          incomingListings.map((listing) => listing.stableKey),
+        );
         for (const event of diffEvents) {
           if (event.listing && shouldSnapshotListingEvent(event)) {
             repository.insertListingSnapshot(event.listing);

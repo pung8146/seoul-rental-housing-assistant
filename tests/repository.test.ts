@@ -300,6 +300,46 @@ describe('sqlite repository', () => {
     ]);
   });
 
+  it('removes stale listings when a later collection has a cleaner listing identity', async () => {
+    const repository = createRepository(':memory:');
+    const firstAdapter: SourceAdapter = {
+      source: 'lh',
+      async fetchNotices() {
+        return [
+          {
+            sourceId: 'notice-1',
+            title: '서울 국민임대 모집',
+            region: '서울',
+            listings: [
+              { title: '29A', supplyType: '29A', region: '서울', floorAreaM2: 29.5 },
+              { title: '29A', supplyType: '29A', region: '서울', floorAreaM2: 29.85 },
+            ],
+          },
+        ];
+      },
+    };
+    const secondAdapter: SourceAdapter = {
+      source: 'lh',
+      async fetchNotices() {
+        return [
+          {
+            sourceId: 'notice-1',
+            title: '서울 국민임대 모집',
+            region: '서울',
+            listings: [{ title: '29A', supplyType: '29A', region: '서울', floorAreaM2: 29.85 }],
+          },
+        ];
+      },
+    };
+
+    await runCollect({ repository, adapters: [firstAdapter] });
+    await runCollect({ repository, adapters: [secondAdapter] });
+
+    expect(repository.queryListingsByNotice('lh', 'notice-1')).toMatchObject([
+      expect.objectContaining({ floorAreaM2: 29.85 }),
+    ]);
+  });
+
   it('collects Seoul and Gyeonggi notices by default', async () => {
     const repository = createRepository(':memory:');
     const adapter: SourceAdapter = {

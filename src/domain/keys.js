@@ -17,6 +17,7 @@ export const buildStableKey = (listing) => hashParts([
     normalizeText(listing.title),
     normalizeText(listing.supplyType),
     normalizeText(listing.region),
+    normalizeNumber(listing.floorAreaM2),
     normalizeText(readMetadataText(listing.metadata, 'building')),
     normalizeText(readMetadataText(listing.metadata, 'unit')),
 ]);

@@ -38,6 +38,21 @@ describe('listing key builders', () => {
         expect(buildStableKey(base)).toBe(buildStableKey(changed));
         expect(buildChangeHash(base)).not.toBe(buildChangeHash(changed));
     });
+    it('uses floor area to distinguish repeated housing types in one notice', () => {
+        const smallUnit = makeListing({
+            title: '국민임대 29A',
+            supplyType: '29A',
+            floorAreaM2: 29.5,
+            metadata: {},
+        });
+        const largeUnit = makeListing({
+            title: '국민임대 29A',
+            supplyType: '29A',
+            floorAreaM2: 29.85,
+            metadata: {},
+        });
+        expect(buildStableKey(smallUnit)).not.toBe(buildStableKey(largeUnit));
+    });
     it('ignores whitespace-only label changes when building the stable key', () => {
         const first = makeListing({
             title: '행복주택   101동   201호',

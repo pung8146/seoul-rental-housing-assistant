@@ -57,6 +57,14 @@ const extractAnchorText = (rowHtml: string): string => {
   return anchorMatch?.[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
 };
 
+const normalizeNoticeTitle = (value: string): string =>
+  value
+    .replace(/\s*\d+일전\s*/g, ' ')
+    .replace(/\s*오늘\s*/g, ' ')
+    .replace(/\bNEW\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const isDateCell = (value: string): boolean => /^\d{4}[-.]\d{2}[-.]\d{2}$/.test(value);
 
 const normalizeLhDate = (value: string): string => value.replace(/\./g, '-');
@@ -153,6 +161,7 @@ export const parseLhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
       titleCellIndex = cells.findIndex((cell, index) => index > 0 && !isDateCell(cell) && isDateCell(cells[index + 3] ?? ''));
       title = cells[titleCellIndex] ?? title;
     }
+    title = normalizeNoticeTitle(title);
     const postedAtIndex = cells.findIndex((cell, index) => index > titleCellIndex && isDateCell(cell));
     const supplyType = titleCellIndex > 1 ? cells[titleCellIndex - 1] : cells[titleCellIndex + 1] ?? '';
     const regionStartIndex = titleCellIndex > 1 ? titleCellIndex + 1 : titleCellIndex + 2;
