@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { createRepository } from '../db/repository.js';
 import { groupNotificationEvents, type NotificationPolicy } from '../domain/notification-policy.js';
 import { loadTelegramNotifyConfig, sendTelegramMessage } from '../notifier/telegram.js';
@@ -12,10 +14,14 @@ const shouldNotify = (message: string, alwaysNotify: boolean): boolean =>
 const getNotificationPolicy = (): NotificationPolicy =>
   process.argv.includes('--notify-all') || process.env.RENTAL_HOUSING_NOTIFY_POLICY === 'all' ? 'all' : 'actionable';
 
+export const buildNotificationPayloadHash = (message: string): string =>
+  createHash('sha256').update(message).digest('hex');
+
 const main = async () => {
   const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
   const dryRun = process.argv.includes('--dry-run');
   const alwaysNotify = process.argv.includes('--always-notify');
+  const forceNotify = process.argv.includes('--force-notify');
 
   try {
     const result = await runCollect({ adapters: createDefaultAdapters(), repository });
@@ -45,15 +51,26 @@ const main = async () => {
       return;
     }
 
-    for (const chatId of config.chatIds) {
+    const payloadHash = buildNotificationPayloadHash(message);
+    const targetChatIds = forceNotify
+      ? config.chatIds
+      : config.chatIds.filter((chatId) => !repository.hasNotification(`telegram:${chatId}`, payloadHash));
+
+    if (targetChatIds.length === 0) {
+      console.log('텔레그램 알림 생략: 이미 발송한 내용입니다.');
+      return;
+    }
+
+    for (const chatId of targetChatIds) {
       await sendTelegramMessage({
         botToken: config.botToken,
         chatId,
         text: message,
       });
+      repository.recordNotification(`telegram:${chatId}`, payloadHash, new Date().toISOString());
     }
 
-    console.log(`텔레그램 알림 발송 완료: ${config.chatIds.length}개 대상`);
+    console.log(`텔레그램 알림 발송 완료: ${targetChatIds.length}개 대상`);
   } finally {
     repository.close();
   }

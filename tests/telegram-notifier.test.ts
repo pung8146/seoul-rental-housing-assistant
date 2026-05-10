@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { loadTelegramNotifyConfig, sendTelegramMessage } from '../src/notifier/telegram.js';
+import { buildNotificationPayloadHash } from '../src/app/run-collect-and-notify.js';
 
 describe('loadTelegramNotifyConfig', () => {
   it('prefers explicit environment variables', () => {
@@ -79,3 +80,9 @@ describe('sendTelegramMessage', () => {
   });
 });
 
+describe('buildNotificationPayloadHash', () => {
+  it('builds stable hashes for duplicate notification suppression', () => {
+    expect(buildNotificationPayloadHash('새 공고')).toBe(buildNotificationPayloadHash('새 공고'));
+    expect(buildNotificationPayloadHash('새 공고')).not.toBe(buildNotificationPayloadHash('다른 공고'));
+  });
+});

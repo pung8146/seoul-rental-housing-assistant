@@ -71,6 +71,8 @@ npm run query -- 서울만 보여줘
 - DB: `/home/pung8146/.openclaw/rental-housing-assistant/rental-housing.db`
 - 새 공고/변경이 없으면 텔레그램을 보내지 않습니다.
 - `--always-notify`를 붙이면 변화가 없어도 결과를 보냅니다.
+- 같은 알림 본문은 채팅방별로 중복 발송하지 않습니다.
+- `--force-notify`를 붙이면 중복 발송 방지를 건너뜁니다.
 - `--dry-run`을 붙이면 텔레그램 설정만 확인하고 실제 발송은 하지 않습니다.
 
 텔레그램 설정은 기본적으로 OpenClaw 설정(`/home/pung8146/.openclaw/openclaw.json`)의 Telegram 채널 정보를 사용합니다. 별도로 지정하려면 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 또는 `TELEGRAM_CHAT_IDS` 환경 변수를 사용합니다.
