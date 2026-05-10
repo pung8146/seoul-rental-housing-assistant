@@ -1,6 +1,8 @@
 import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
 export const formatNoticeSummaryLine = (notice, index, eligibility) => {
-    const details = [notice.region, notice.status].filter((value) => Boolean(value)).join(' · ');
+    const details = [notice.region, getApplicationStatus(notice), notice.postedAt ? `게시 ${notice.postedAt}` : null]
+        .filter((value) => Boolean(value))
+        .join(' · ');
     const prefix = eligibility ? `[${eligibility.label}] ` : '';
     const reasons = eligibility?.reasons.length ? ` - ${eligibility.reasons.join(', ')}` : '';
     return `${index}. ${prefix}${notice.title}${details ? ` (${details})` : ''}${reasons}`;
@@ -11,8 +13,92 @@ const formatCurrency = (value) => {
     }
     return `${value.toLocaleString('ko-KR')}원`;
 };
+const getKoreaToday = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        day: '2-digit',
+        month: '2-digit',
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+    }).formatToParts(new Date());
+    const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+    return `${year}-${month}-${day}`;
+};
+const getApplicationStatus = (notice) => {
+    if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
+        return '마감';
+    }
+    const today = getKoreaToday();
+    if (notice.applicationEndAt && notice.applicationEndAt < today) {
+        return '마감';
+    }
+    if (notice.applicationStartAt && notice.applicationStartAt > today) {
+        return '접수예정';
+    }
+    if (notice.applicationStartAt &&
+        notice.applicationStartAt <= today &&
+        notice.applicationEndAt &&
+        notice.applicationEndAt >= today) {
+        return '신청가능';
+    }
+    if (notice.status && /(공고중|정정공고중|게시|posted|모집중)/i.test(notice.status)) {
+        return '공고중';
+    }
+    return '확인필요';
+};
+const formatApplicationPeriod = (notice) => {
+    if (notice.applicationStartAt && notice.applicationEndAt) {
+        return `${notice.applicationStartAt} ~ ${notice.applicationEndAt}`;
+    }
+    if (notice.applicationStartAt) {
+        return `${notice.applicationStartAt} ~ 확인필요`;
+    }
+    if (notice.applicationEndAt) {
+        return `확인필요 ~ ${notice.applicationEndAt}`;
+    }
+    return '확인필요';
+};
+const getAttachments = (notice) => {
+    const attachments = notice.metadata.attachments;
+    if (!Array.isArray(attachments)) {
+        return [];
+    }
+    return attachments.filter((attachment) => typeof attachment === 'object' &&
+        attachment !== null &&
+        typeof attachment.title === 'string' &&
+        typeof attachment.url === 'string');
+};
+const hasEligibilityRequirements = (notice) => {
+    const requirements = notice.metadata.eligibilityRequirements;
+    return Boolean(requirements &&
+        typeof requirements === 'object' &&
+        !Array.isArray(requirements) &&
+        Object.keys(requirements).length > 0);
+};
+const formatDetailQuality = (notice, listings) => {
+    const attachments = getAttachments(notice);
+    const applicationPeriod = notice.applicationStartAt && notice.applicationEndAt
+        ? '신청기간 확인됨'
+        : notice.applicationStartAt || notice.applicationEndAt
+            ? '신청기간 일부 확인'
+            : '신청기간 확인필요';
+    const applicationAttachment = getPrimaryApplicationAttachment(notice.metadata)
+        ? '공고문 확인됨'
+        : attachments.length > 0
+            ? '공고문 첨부 있음'
+            : '공고문 확인필요';
+    const eligibilityRequirements = hasEligibilityRequirements(notice) ? '신청조건 추출됨' : '신청조건 확인필요';
+    const listingQuality = listings.length > 0 ? `매물정보 ${listings.length}건` : '매물정보 확인필요';
+    return [applicationPeriod, applicationAttachment, eligibilityRequirements, listingQuality].join(' · ');
+};
 const formatNoticeMeta = (notice) => {
-    const parts = [notice.region, notice.targetTags.length ? notice.targetTags.join(', ') : null, notice.postedAt]
+    const parts = [
+        notice.region,
+        getApplicationStatus(notice),
+        notice.targetTags.length ? notice.targetTags.join(', ') : null,
+        notice.postedAt ? `게시 ${notice.postedAt}` : null,
+    ]
         .filter((value) => Boolean(value));
     return parts.join(' · ');
 };
@@ -81,6 +167,12 @@ export const formatDailySummary = (events, failures = []) => {
 };
 export const formatNoticeDetails = (notice, listings, eligibility) => {
     const lines = [notice.title];
+    lines.push(`신청상태: ${getApplicationStatus(notice)}`);
+    if (notice.postedAt) {
+        lines.push(`게시일: ${notice.postedAt}`);
+    }
+    lines.push(`신청기간: ${formatApplicationPeriod(notice)}`);
+    lines.push(`상세 확인: ${formatDetailQuality(notice, listings)}`);
     if (eligibility) {
         lines.push(`지원가능성: ${eligibility.label}`);
         if (eligibility.reasons.length > 0) {
