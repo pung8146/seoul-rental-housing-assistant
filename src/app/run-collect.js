@@ -12,6 +12,7 @@ const toMessage = (error) => {
 };
 const DETAIL_FETCH_CONCURRENCY = 5;
 const DEFAULT_COLLECT_REGIONS = ['서울', '경기'];
+const EMPTY_COLLECT_MESSAGE = '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.';
 export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
 export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 const filterNoticesByRegion = (rawNotices, regions) => rawNotices.filter((notice) => {
@@ -40,6 +41,17 @@ export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLE
         const startedAt = new Date().toISOString();
         try {
             const rawNotices = await adapter.fetchNotices();
+            if (rawNotices.length === 0) {
+                failures.push({ source: adapter.source, message: EMPTY_COLLECT_MESSAGE });
+                repository.recordSourceRun({
+                    source: adapter.source,
+                    startedAt,
+                    finishedAt: new Date().toISOString(),
+                    status: 'partial',
+                    message: EMPTY_COLLECT_MESSAGE,
+                });
+                continue;
+            }
             const scopedNotices = filterNoticesByRegion(rawNotices, regions);
             const detailedNotices = await hydrateNoticeDetails(adapter, scopedNotices);
             const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });

@@ -133,6 +133,32 @@ describe('sqlite repository', () => {
     ]);
   });
 
+  it('records a partial source run when a live adapter returns no parseable notices', async () => {
+    const repository = createRepository(':memory:');
+    const adapter: SourceAdapter = {
+      source: 'lh',
+      async fetchNotices() {
+        return [];
+      },
+    };
+
+    const result = await runCollect({ adapters: [adapter], repository });
+
+    expect(result.failures).toEqual([
+      {
+        source: 'lh',
+        message: '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.',
+      },
+    ]);
+    expect(repository.listSourceRuns()).toMatchObject([
+      {
+        source: 'lh',
+        status: 'partial',
+        message: '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.',
+      },
+    ]);
+  });
+
   it('runs collection across adapters, persists output, emits events, and keeps partial failures', async () => {
     const repository = createRepository(':memory:');
     const primaryAdapter: SourceAdapter = {
