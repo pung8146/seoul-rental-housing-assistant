@@ -9,6 +9,7 @@ const view: DashboardView = {
     excludedCount: 1,
     sourceRunCount: 1,
   },
+  profile: null,
   actionableNotices: [
     {
       source: 'lh',
@@ -25,6 +26,11 @@ const view: DashboardView = {
       applicationEndAt: '2026-05-20',
       sourceUrl: 'https://example.com/notice',
       metadata: {},
+      eligibility: {
+        status: 'missing_profile',
+        label: '프로필 필요',
+        reasons: ['내 정보가 아직 저장되지 않음'],
+      },
     },
   ],
   excludedNotices: [
@@ -44,6 +50,11 @@ const view: DashboardView = {
       sourceUrl: 'https://example.com/excluded',
       metadata: {},
       exclusionReason: 'service_notice',
+      eligibility: {
+        status: 'missing_profile',
+        label: '프로필 필요',
+        reasons: ['내 정보가 아직 저장되지 않음'],
+      },
     },
   ],
   selectedNotice: {
@@ -62,6 +73,11 @@ const view: DashboardView = {
       applicationEndAt: '2026-05-20',
       sourceUrl: 'https://example.com/notice',
       metadata: { attachments: [{ title: '공고문.pdf', url: 'https://example.com/file.pdf' }] },
+      eligibility: {
+        status: 'missing_profile',
+        label: '프로필 필요',
+        reasons: ['내 정보가 아직 저장되지 않음'],
+      },
     },
     listings: [
       {

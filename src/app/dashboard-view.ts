@@ -1,9 +1,11 @@
 import { getNoticeExclusionReason, type NoticeExclusionReason } from '../domain/actionable.js';
-import type { Listing, Notice, SourceRun } from '../types.js';
+import { assessEligibility, type EligibilityAssessment } from '../domain/eligibility.js';
+import type { Listing, Notice, PersonalProfile, SourceRun } from '../types.js';
 import type { Repository } from '../db/repository.js';
 
 export type DashboardNoticeSummary = Notice & {
   noticeKey: string;
+  eligibility: EligibilityAssessment;
 };
 
 export type ExcludedDashboardNotice = DashboardNoticeSummary & {
@@ -21,6 +23,7 @@ export type DashboardView = {
     excludedCount: number;
     sourceRunCount: number;
   };
+  profile: PersonalProfile | null;
   actionableNotices: DashboardNoticeSummary[];
   excludedNotices: ExcludedDashboardNotice[];
   selectedNotice: SelectedDashboardNotice | null;
@@ -28,16 +31,17 @@ export type DashboardView = {
 };
 
 type BuildDashboardViewInput = {
-  repository: Pick<Repository, 'queryNotices' | 'queryListingsByNotice' | 'listSourceRuns'>;
+  repository: Pick<Repository, 'queryNotices' | 'queryListingsByNotice' | 'listSourceRuns' | 'getPersonalProfile'>;
   selectedNoticeKey?: string | null;
 };
 
 const toNoticeKey = (notice: Pick<Notice, 'source' | 'sourceId'>): string =>
   `${notice.source}:${notice.sourceId}`;
 
-const withNoticeKey = (notice: Notice): DashboardNoticeSummary => ({
+const withNoticeKey = (notice: Notice, profile: PersonalProfile | null): DashboardNoticeSummary => ({
   ...notice,
   noticeKey: toNoticeKey(notice),
+  eligibility: assessEligibility(profile, notice),
 });
 
 const latestFirst = (runs: SourceRun[]): SourceRun[] =>
@@ -49,11 +53,12 @@ export const buildDashboardView = ({
 }: BuildDashboardViewInput): DashboardView => {
   const notices = repository.queryNotices({});
   const sourceRuns = repository.listSourceRuns();
+  const profile = repository.getPersonalProfile();
   const actionableNotices: DashboardNoticeSummary[] = [];
   const excludedNotices: ExcludedDashboardNotice[] = [];
 
   for (const notice of notices) {
-    const keyedNotice = withNoticeKey(notice);
+    const keyedNotice = withNoticeKey(notice, profile);
     const exclusionReason = getNoticeExclusionReason(notice);
     if (exclusionReason) {
       excludedNotices.push({
@@ -74,6 +79,7 @@ export const buildDashboardView = ({
       excludedCount: excludedNotices.length,
       sourceRunCount: sourceRuns.length,
     },
+    profile,
     actionableNotices,
     excludedNotices,
     selectedNotice: selectedNotice

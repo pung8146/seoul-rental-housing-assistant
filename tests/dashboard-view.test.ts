@@ -50,6 +50,16 @@ describe('buildDashboardView', () => {
     repository.upsertNotice(actionable);
     repository.upsertNotice(excluded);
     repository.upsertListing(makeListing(actionable, 1));
+    repository.savePersonalProfile({
+      birthYear: 1995,
+      isHomeless: true,
+      residenceRegion: '서울',
+      householdSize: 1,
+      monthlyIncome: 2500000,
+      totalAssets: 50000000,
+      vehicleValue: 0,
+      interestTags: ['청년'],
+    });
     repository.recordSourceRun({
       source: 'lh',
       startedAt: '2026-05-09T10:00:00.000Z',
@@ -65,7 +75,9 @@ describe('buildDashboardView', () => {
 
     expect(view.stats.actionableCount).toBe(1);
     expect(view.stats.excludedCount).toBe(1);
+    expect(view.profile?.birthYear).toBe(1995);
     expect(view.actionableNotices[0]?.title).toBe(actionable.title);
+    expect(view.actionableNotices[0]?.eligibility.label).toBe('지원가능성 높음');
     expect(view.excludedNotices[0]).toMatchObject({
       title: excluded.title,
       exclusionReason: 'service_notice',
