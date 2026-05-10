@@ -55,25 +55,40 @@ const formatChangedFields = (event: NotificationEvent): string[] => {
   return changes;
 };
 
+const eventNoticeKey = (event: NotificationEvent): string =>
+  `${event.notice.source}:${event.notice.sourceId}:${event.type === 'new_notice' ? event.occurredAt : 'listing'}`;
+
+const summarizeEventGroup = (events: NotificationEvent[]): string => {
+  const firstEvent = events[0];
+  if (!firstEvent) {
+    return '';
+  }
+
+  const hasNewNotice = events.some((event) => event.type === 'new_notice');
+  const hasChangedListing = events.some((event) => event.type === 'listing_changed');
+  const eventLabel = hasNewNotice ? '신규' : hasChangedListing ? '변경' : '추가';
+  const listingCount = events.filter((event) => event.listing).length;
+  const countLabel = hasNewNotice ? '매물 1건' : listingCount > 0 ? `매물 ${listingCount}건` : null;
+  const header = [eventLabel, firstEvent.notice.title].join(' · ');
+  const body = [formatNoticeMeta(firstEvent.notice), countLabel, firstEvent.notice.sourceUrl]
+    .filter((value): value is string => Boolean(value))
+    .join('\n');
+  const changed = events.flatMap(formatChangedFields);
+  const uniqueChanged = Array.from(new Set(changed)).slice(0, 3);
+
+  return [header, body, ...uniqueChanged].filter(Boolean).join('\n');
+};
+
 export const formatDailySummary = (
   events: NotificationEvent[],
   failures: Failure[] = [],
 ): string => {
-  const lines = events.map((event) => {
-    const countLabel = event.type === 'new_notice' ? '매물 1건' : null;
-    const header = [
-      event.type === 'listing_changed' ? '변경' : event.type === 'listing_added' ? '추가' : '신규',
-      event.notice.title,
-    ].join(' · ');
-
-    const body = [formatNoticeMeta(event.notice), countLabel, event.notice.sourceUrl]
-      .filter((value): value is string => Boolean(value))
-      .join('\n');
-
-    const changed = formatChangedFields(event);
-
-    return [header, body, ...changed].filter(Boolean).join('\n');
-  });
+  const eventGroups = new Map<string, NotificationEvent[]>();
+  for (const event of events) {
+    const key = eventNoticeKey(event);
+    eventGroups.set(key, [...(eventGroups.get(key) ?? []), event]);
+  }
+  const lines = Array.from(eventGroups.values()).map(summarizeEventGroup);
 
   if (failures.length > 0) {
     lines.push(

@@ -70,6 +70,35 @@ describe('formatDailySummary', () => {
         expect(summary).toContain('월세: 250,000원 → 270,000원');
         expect(summary).toContain('상태: 공급중 → 마감임박');
     });
+    it('groups multiple listing events for the same notice into one summary block', () => {
+        const summary = formatDailySummary([
+            makeEvent({
+                type: 'listing_changed',
+                notice: makeNotice(),
+                listing: makeListing({ changeHash: 'listing-hash-2', title: '101동 201호', monthlyRent: 270000 }),
+                previousNotice: makeNotice(),
+                previousListing: makeListing({ title: '101동 201호' }),
+            }),
+            makeEvent({
+                type: 'listing_changed',
+                notice: makeNotice(),
+                listing: makeListing({
+                    stableKey: 'listing:lh:notice-1:101-202',
+                    changeHash: 'listing-hash-3',
+                    title: '101동 202호',
+                    monthlyRent: 280000,
+                }),
+                previousNotice: makeNotice(),
+                previousListing: makeListing({
+                    stableKey: 'listing:lh:notice-1:101-202',
+                    title: '101동 202호',
+                }),
+            }),
+        ]);
+        expect(summary.match(/변경 · 서울 청년 임대주택 모집/g)).toHaveLength(1);
+        expect(summary).toContain('매물 2건');
+        expect(summary).toContain('월세: 250,000원 → 270,000원');
+    });
     it('adds a source failure section when some sources fail', () => {
         const summary = formatDailySummary([makeEvent()], [
             { source: 'lh', message: 'network timeout' },
