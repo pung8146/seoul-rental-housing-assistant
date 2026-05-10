@@ -32,11 +32,35 @@ const makeNotice = (overrides: Partial<Notice> = {}): Notice => ({
 });
 
 describe('assessEligibility', () => {
-  it('marks likely eligible notices when profile tags and region match', () => {
+  it('asks for review when no parsed requirements are available', () => {
     expect(assessEligibility(profile, makeNotice())).toEqual({
+      status: 'review',
+      label: '조건 확인 필요',
+      reasons: ['공고문에서 신청 조건을 찾지 못함', '첨부 PDF 확인 필요'],
+    });
+  });
+
+  it('marks likely eligible notices only when parsed requirements pass and profile tags match', () => {
+    expect(
+      assessEligibility(
+        profile,
+        makeNotice({
+          metadata: {
+            eligibilityRequirements: {
+              minAge: 19,
+              maxAge: 39,
+              requiresHomeless: true,
+              maxMonthlyIncome: 3589957,
+              maxTotalAssets: 345000000,
+              maxVehicleValue: 37080000,
+            },
+          },
+        }),
+      ),
+    ).toEqual({
       status: 'likely',
       label: '지원가능성 높음',
-      reasons: ['관심 유형 일치', '지역 일치', '무주택 조건 입력됨'],
+      reasons: ['관심 유형 일치', '지역 일치', '추출 조건 통과'],
     });
   });
 
@@ -55,7 +79,19 @@ describe('assessEligibility', () => {
   });
 
   it('asks for income asset review when financial inputs are missing', () => {
-    expect(assessEligibility({ ...profile, monthlyIncome: null, totalAssets: null }, makeNotice())).toMatchObject({
+    expect(
+      assessEligibility(
+        { ...profile, monthlyIncome: null, totalAssets: null },
+        makeNotice({
+          metadata: {
+            eligibilityRequirements: {
+              maxMonthlyIncome: 3589957,
+              maxTotalAssets: 345000000,
+            },
+          },
+        }),
+      ),
+    ).toMatchObject({
       status: 'financial_review',
       label: '소득/자산 확인 필요',
     });

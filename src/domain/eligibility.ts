@@ -61,6 +61,9 @@ const getReferenceYear = (notice: Notice): number => {
   return Number.isInteger(year) && year > 0 ? year : new Date().getFullYear();
 };
 
+const hasEligibilityRequirements = (requirements: EligibilityRequirements): boolean =>
+  Object.values(requirements).some((value) => value != null);
+
 const assessParsedRequirements = (
   profile: PersonalProfile,
   notice: Notice,
@@ -132,6 +135,15 @@ export const assessEligibility = (
     return parsedRequirementAssessment;
   }
 
+  const requirements = getEligibilityRequirements(notice);
+  if (!hasEligibilityRequirements(requirements)) {
+    return {
+      status: 'review',
+      label: '조건 확인 필요',
+      reasons: ['공고문에서 신청 조건을 찾지 못함', '첨부 PDF 확인 필요'],
+    };
+  }
+
   if (profile.monthlyIncome == null || profile.totalAssets == null || profile.vehicleValue == null) {
     return { status: 'financial_review', label: '소득/자산 확인 필요', reasons: ['소득/자산/자동차가액 입력 필요'] };
   }
@@ -143,8 +155,8 @@ export const assessEligibility = (
   if (profile.residenceRegion && notice.region === profile.residenceRegion) {
     reasons.push('지역 일치');
   }
-  if (profile.isHomeless === true) {
-    reasons.push('무주택 조건 입력됨');
+  if (hasEligibilityRequirements(requirements)) {
+    reasons.push('추출 조건 통과');
   }
 
   if (reasons.length >= 2 && matchingInterestTags(profile, notice).length > 0) {

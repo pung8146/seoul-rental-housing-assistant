@@ -47,6 +47,24 @@ const withNoticeKey = (notice: Notice, profile: PersonalProfile | null): Dashboa
 const latestFirst = (runs: SourceRun[]): SourceRun[] =>
   [...runs].sort((left, right) => right.finishedAt.localeCompare(left.finishedAt));
 
+const eligibilityPriority: Record<EligibilityAssessment['status'], number> = {
+  likely: 0,
+  review: 1,
+  financial_review: 2,
+  missing_profile: 3,
+  not_target: 4,
+};
+
+const safestFirst = (notices: DashboardNoticeSummary[]): DashboardNoticeSummary[] =>
+  [...notices].sort((left, right) => {
+    const priorityDifference = eligibilityPriority[left.eligibility.status] - eligibilityPriority[right.eligibility.status];
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    return (right.postedAt ?? '').localeCompare(left.postedAt ?? '');
+  });
+
 export const buildDashboardView = ({
   repository,
   selectedNoticeKey,
@@ -70,8 +88,11 @@ export const buildDashboardView = ({
     }
   }
 
+  const sortedActionableNotices = safestFirst(actionableNotices);
   const selectedNotice =
-    actionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ?? actionableNotices[0] ?? null;
+    sortedActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
+    sortedActionableNotices[0] ??
+    null;
 
   return {
     stats: {
@@ -80,7 +101,7 @@ export const buildDashboardView = ({
       sourceRunCount: sourceRuns.length,
     },
     profile,
-    actionableNotices,
+    actionableNotices: sortedActionableNotices,
     excludedNotices,
     selectedNotice: selectedNotice
       ? {

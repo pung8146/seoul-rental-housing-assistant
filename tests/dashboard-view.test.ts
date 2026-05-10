@@ -41,15 +41,29 @@ const makeListing = (notice: Notice, index: number, overrides: Partial<Listing> 
 describe('buildDashboardView', () => {
   it('separates actionable and excluded notices with selected details', () => {
     const repository = createRepository(':memory:');
-    const actionable = makeNotice(1);
+    const reviewNotice = makeNotice(1, { postedAt: '2026-05-09' });
+    const likelyNotice = makeNotice(3, {
+      postedAt: '2026-05-01',
+      metadata: {
+        eligibilityRequirements: {
+          minAge: 19,
+          maxAge: 39,
+          requiresHomeless: true,
+          maxMonthlyIncome: 3589957,
+          maxTotalAssets: 345000000,
+          maxVehicleValue: 37080000,
+        },
+      },
+    });
     const excluded = makeNotice(2, {
       title: '전산작업에 따른 서비스(신한인증서) 이용 안내',
       source: 'sh',
     });
 
-    repository.upsertNotice(actionable);
+    repository.upsertNotice(reviewNotice);
+    repository.upsertNotice(likelyNotice);
     repository.upsertNotice(excluded);
-    repository.upsertListing(makeListing(actionable, 1));
+    repository.upsertListing(makeListing(likelyNotice, 1));
     repository.savePersonalProfile({
       birthYear: 1995,
       isHomeless: true,
@@ -70,19 +84,23 @@ describe('buildDashboardView', () => {
 
     const view = buildDashboardView({
       repository,
-      selectedNoticeKey: 'lh:notice-1',
+      selectedNoticeKey: null,
     });
 
-    expect(view.stats.actionableCount).toBe(1);
+    expect(view.stats.actionableCount).toBe(2);
     expect(view.stats.excludedCount).toBe(1);
     expect(view.profile?.birthYear).toBe(1995);
-    expect(view.actionableNotices[0]?.title).toBe(actionable.title);
+    expect(view.actionableNotices.map((notice) => notice.eligibility.label)).toEqual([
+      '지원가능성 높음',
+      '조건 확인 필요',
+    ]);
+    expect(view.actionableNotices[0]?.title).toBe(likelyNotice.title);
     expect(view.actionableNotices[0]?.eligibility.label).toBe('지원가능성 높음');
     expect(view.excludedNotices[0]).toMatchObject({
       title: excluded.title,
       exclusionReason: 'service_notice',
     });
-    expect(view.selectedNotice?.notice.title).toBe(actionable.title);
+    expect(view.selectedNotice?.notice.title).toBe(likelyNotice.title);
     expect(view.selectedNotice?.listings).toHaveLength(1);
     expect(view.sourceRuns[0]).toMatchObject({
       source: 'lh',

@@ -7,6 +7,20 @@ const withNoticeKey = (notice, profile) => ({
     eligibility: assessEligibility(profile, notice),
 });
 const latestFirst = (runs) => [...runs].sort((left, right) => right.finishedAt.localeCompare(left.finishedAt));
+const eligibilityPriority = {
+    likely: 0,
+    review: 1,
+    financial_review: 2,
+    missing_profile: 3,
+    not_target: 4,
+};
+const safestFirst = (notices) => [...notices].sort((left, right) => {
+    const priorityDifference = eligibilityPriority[left.eligibility.status] - eligibilityPriority[right.eligibility.status];
+    if (priorityDifference !== 0) {
+        return priorityDifference;
+    }
+    return (right.postedAt ?? '').localeCompare(left.postedAt ?? '');
+});
 export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
     const notices = repository.queryNotices({});
     const sourceRuns = repository.listSourceRuns();
@@ -26,7 +40,10 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
             actionableNotices.push(keyedNotice);
         }
     }
-    const selectedNotice = actionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ?? actionableNotices[0] ?? null;
+    const sortedActionableNotices = safestFirst(actionableNotices);
+    const selectedNotice = sortedActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
+        sortedActionableNotices[0] ??
+        null;
     return {
         stats: {
             actionableCount: actionableNotices.length,
@@ -34,7 +51,7 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
             sourceRunCount: sourceRuns.length,
         },
         profile,
-        actionableNotices,
+        actionableNotices: sortedActionableNotices,
         excludedNotices,
         selectedNotice: selectedNotice
             ? {
