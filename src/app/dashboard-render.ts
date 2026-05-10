@@ -19,6 +19,34 @@ const formatMoney = (value: number | null): string =>
 
 const formatDate = (value: string | null): string => value ?? '-';
 
+const getKoreaToday = (): string => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+  const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+  const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+  return `${year}-${month}-${day}`;
+};
+
+const cleanRelativeAge = (title: string): string => title.replace(/\s*\d+일전/g, '').replace(/\s+/g, ' ').trim();
+
+const isClosedNotice = (notice: Pick<Notice, 'applicationEndAt' | 'status'>): boolean => {
+  if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
+    return true;
+  }
+
+  return Boolean(notice.applicationEndAt && notice.applicationEndAt < getKoreaToday());
+};
+
+const renderStatusBadge = (notice: Pick<Notice, 'applicationEndAt' | 'status'>): string =>
+  isClosedNotice(notice)
+    ? '<span class="status-badge closed">마감</span>'
+    : '<span class="status-badge open">진행</span>';
+
 const reasonLabel = (notice: ExcludedDashboardNotice): string => {
   if (notice.exclusionReason === 'service_notice') {
     return '서비스 안내';
@@ -48,16 +76,17 @@ const renderNoticeRow = (notice: DashboardView['actionableNotices'][number], sel
   <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="/?notice=${encodeURIComponent(
     notice.noticeKey,
   )}">
-    <span class="notice-title">${escapeHtml(notice.title)}</span>
+    <span class="notice-title">${escapeHtml(cleanRelativeAge(notice.title))}</span>
     <span class="notice-meta">${escapeHtml(notice.source.toUpperCase())} · ${escapeHtml(notice.region)} · ${escapeHtml(
       notice.status,
-    )}</span>
+    )} · 등록일 ${escapeHtml(formatDate(notice.postedAt))}</span>
+    ${renderStatusBadge(notice)}
   </a>
 `;
 
 const renderListing = (listing: Listing): string => `
   <tr>
-    <td>${escapeHtml(listing.title)}</td>
+    <td>${escapeHtml(cleanRelativeAge(listing.title))}</td>
     <td>${escapeHtml(listing.supplyType)}</td>
     <td>${escapeHtml(listing.floorAreaM2 ?? '-')}</td>
     <td>${formatMoney(listing.deposit)}</td>
@@ -151,6 +180,24 @@ export const renderDashboardHtml = (view: DashboardView): string => {
     }
     .stat strong { display: block; font-size: 24px; margin-bottom: 4px; }
     .stat span, .notice-meta, .muted { color: var(--muted); }
+    .status-badge {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .status-badge.open {
+      color: #166534;
+      background: #dcfce7;
+      border: 1px solid #86efac;
+    }
+    .status-badge.closed {
+      color: #991b1b;
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+    }
     .notice-list { display: grid; }
     .notice-row {
       display: grid;
@@ -236,7 +283,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
               (notice) => `
                 <div class="excluded-item">
                   <strong>${escapeHtml(reasonLabel(notice))}</strong>
-                  <div>${escapeHtml(notice.title)}</div>
+                  <div>${escapeHtml(cleanRelativeAge(notice.title))}</div>
                 </div>
               `,
             )
@@ -260,11 +307,12 @@ export const renderDashboardHtml = (view: DashboardView): string => {
         ${
           selectedNotice
             ? `<div class="detail">
-                <h3>${escapeHtml(selectedNotice.title)}</h3>
+                <h3>${escapeHtml(cleanRelativeAge(selectedNotice.title))}</h3>
                 <div class="detail-grid">
                   <div class="field"><span>기관</span>${escapeHtml(selectedNotice.source.toUpperCase())}</div>
                   <div class="field"><span>지역</span>${escapeHtml(selectedNotice.region)}</div>
-                  <div class="field"><span>상태</span>${escapeHtml(selectedNotice.status)}</div>
+                  <div class="field"><span>상태</span>${renderStatusBadge(selectedNotice)} ${escapeHtml(selectedNotice.status)}</div>
+                  <div class="field"><span>등록일</span>${escapeHtml(formatDate(selectedNotice.postedAt))}</div>
                   <div class="field"><span>마감</span>${escapeHtml(formatDate(selectedNotice.applicationEndAt))}</div>
                 </div>
                 <div class="attachments">

@@ -112,4 +112,38 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert(1)</script>');
   });
+
+  it('shows posted dates instead of relative day labels and distinguishes closed notices', () => {
+    const html = renderDashboardHtml({
+      ...view,
+      actionableNotices: [
+        {
+          ...view.actionableNotices[0]!,
+          title: '서울가좌 행복주택 예비입주자 모집공고(2026.05.07) 1일전',
+          postedAt: '2026-05-08',
+          applicationEndAt: '2020-01-01',
+        },
+      ],
+      selectedNotice: {
+        notice: {
+          ...view.selectedNotice!.notice,
+          title: '서울가좌 행복주택 예비입주자 모집공고(2026.05.07) 1일전',
+          postedAt: '2026-05-08',
+          applicationEndAt: '2020-01-01',
+        },
+        listings: [
+          {
+            ...view.selectedNotice!.listings[0]!,
+            title: '서울가좌 행복주택 예비입주자 모집공고(2026.05.07) 1일전 16형 대학생',
+          },
+        ],
+      },
+    });
+
+    expect(html).toContain('등록일 2026-05-08');
+    expect(html).toContain('<span class="status-badge closed">마감</span>');
+    expect(html).toContain('서울가좌 행복주택 예비입주자 모집공고(2026.05.07)');
+    expect(html).toContain('서울가좌 행복주택 예비입주자 모집공고(2026.05.07) 16형 대학생');
+    expect(html).not.toContain('1일전');
+  });
 });
