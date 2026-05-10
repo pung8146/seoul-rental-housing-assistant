@@ -200,6 +200,28 @@ const renderSourceRun = (run: SourceRun): string => `
   </tr>
 `;
 
+const renderSourceStatusBadge = (status: DashboardView['sourceStatuses'][number]): string =>
+  `<span class="collect-badge ${status.runStatus}">${escapeHtml(status.statusLabel)}</span>`;
+
+const renderSourceStatus = (status: DashboardView['sourceStatuses'][number]): string => `
+  <article class="source-status">
+    <div class="source-status-main">
+      <strong>${escapeHtml(status.source.toUpperCase())}</strong>
+      ${renderSourceStatusBadge(status)}
+    </div>
+    <div class="source-status-time">${escapeHtml(status.lastFinishedAt ?? '수집 기록 없음')}</div>
+    <div class="source-metrics">
+      <span>전체 ${status.totalNotices}건</span>
+      <span>지원 후보 ${status.actionableNotices}건</span>
+      <span>제외 ${status.excludedNotices}건</span>
+      <span>상세매물 ${status.detailListings}건</span>
+      <span>조건 ${status.parsedConditionNotices}건</span>
+      <span>첨부 ${status.attachmentNotices}건</span>
+    </div>
+    ${status.message ? `<div class="source-message">${escapeHtml(status.message)}</div>` : ''}
+  </article>
+`;
+
 export const renderDashboardHtml = (view: DashboardView): string => {
   const selectedKey = view.selectedNotice?.notice.noticeKey;
   const selectedNotice = view.selectedNotice?.notice;
@@ -478,6 +500,73 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       text-decoration: none;
       font-weight: 650;
     }
+    .source-status-list {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+    }
+    .source-status {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfe;
+    }
+    .source-status-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .collect-badge {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+    }
+    .collect-badge.success {
+      color: #166534;
+      background: #dcfce7;
+      border-color: #86efac;
+    }
+    .collect-badge.partial {
+      color: #854d0e;
+      background: #fef9c3;
+      border-color: #fde047;
+    }
+    .collect-badge.failure {
+      color: #991b1b;
+      background: #fee2e2;
+      border-color: #fecaca;
+    }
+    .source-status-time, .source-message {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .source-message {
+      color: #991b1b;
+    }
+    .source-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .source-metrics span {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--muted);
+      background: #ffffff;
+      font-size: 12px;
+      font-weight: 650;
+    }
     @media (max-width: 900px) {
       main { grid-template-columns: 1fr; }
       .detail-grid, .stats { grid-template-columns: 1fr; }
@@ -564,7 +653,13 @@ export const renderDashboardHtml = (view: DashboardView): string => {
         }
       </section>
       <section>
-        <div class="section-header"><h2>수집 상태</h2></div>
+        <div class="section-header"><h2>기관별 수집 상태</h2></div>
+        <div class="source-status-list">
+          ${view.sourceStatuses.map(renderSourceStatus).join('') || '<div class="muted">수집 상태가 없습니다.</div>'}
+        </div>
+      </section>
+      <section>
+        <div class="section-header"><h2>수집 이력</h2></div>
         <div class="detail table-wrap">
           <table>
             <thead><tr><th>기관</th><th>상태</th><th>완료 시각</th><th>메시지</th></tr></thead>

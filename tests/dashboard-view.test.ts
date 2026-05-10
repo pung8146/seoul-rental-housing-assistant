@@ -102,6 +102,34 @@ describe('buildDashboardView', () => {
     });
     expect(view.selectedNotice?.notice.title).toBe(likelyNotice.title);
     expect(view.selectedNotice?.listings).toHaveLength(1);
+    expect(view.sourceStatuses).toEqual([
+      {
+        source: 'lh',
+        runStatus: 'success',
+        statusLabel: '최근 성공',
+        lastFinishedAt: '2026-05-09T10:00:02.000Z',
+        message: null,
+        totalNotices: 2,
+        actionableNotices: 2,
+        excludedNotices: 0,
+        detailListings: 1,
+        parsedConditionNotices: 1,
+        attachmentNotices: 0,
+      },
+      {
+        source: 'sh',
+        runStatus: 'unknown',
+        statusLabel: '수집 기록 없음',
+        lastFinishedAt: null,
+        message: null,
+        totalNotices: 1,
+        actionableNotices: 0,
+        excludedNotices: 1,
+        detailListings: 0,
+        parsedConditionNotices: 0,
+        attachmentNotices: 0,
+      },
+    ]);
     expect(view.sourceRuns[0]).toMatchObject({
       source: 'lh',
       status: 'success',

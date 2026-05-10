@@ -106,6 +106,34 @@ const view: DashboardView = {
       },
     ],
   },
+  sourceStatuses: [
+    {
+      source: 'lh',
+      runStatus: 'success',
+      statusLabel: '최근 성공',
+      lastFinishedAt: '2026-05-09T10:00:02.000Z',
+      message: null,
+      totalNotices: 1,
+      actionableNotices: 1,
+      excludedNotices: 0,
+      detailListings: 1,
+      parsedConditionNotices: 1,
+      attachmentNotices: 1,
+    },
+    {
+      source: 'sh',
+      runStatus: 'failure',
+      statusLabel: '최근 실패',
+      lastFinishedAt: '2026-05-09T10:00:03.000Z',
+      message: 'network timeout',
+      totalNotices: 0,
+      actionableNotices: 0,
+      excludedNotices: 0,
+      detailListings: 0,
+      parsedConditionNotices: 0,
+      attachmentNotices: 0,
+    },
+  ],
   sourceRuns: [
     {
       source: 'lh',
@@ -133,6 +161,13 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('지원 가능 공고');
     expect(html).toContain('제외된 글');
     expect(html).toContain('수집 상태');
+    expect(html).toContain('기관별 수집 상태');
+    expect(html).toContain('최근 성공');
+    expect(html).toContain('최근 실패');
+    expect(html).toContain('전체 1건');
+    expect(html).toContain('조건 1건');
+    expect(html).toContain('첨부 1건');
+    expect(html).toContain('network timeout');
     expect(html).toContain('<details class="profile-panel">');
     expect(html).toContain('<summary class="profile-summary">');
     expect(html).toContain('내 조건');
