@@ -250,6 +250,7 @@ const LH_FIXTURE = [
 ];
 export const createLhAdapter = (options = {}) => {
     const fetchImpl = options.fetch ?? fetch;
+    const useFixtureFallback = options.useFixtureFallback ?? false;
     const noticesById = new Map();
     return {
         source: 'lh',
@@ -257,13 +258,13 @@ export const createLhAdapter = (options = {}) => {
             const response = await fetchImpl(LH_NOTICE_LIST_URL);
             const html = await response.text();
             const notices = parseLhNoticeListHtml(html);
-            const result = notices.length > 0 ? notices : LH_FIXTURE;
+            const result = notices.length > 0 || !useFixtureFallback ? notices : LH_FIXTURE;
             noticesById.clear();
             result.forEach((notice) => noticesById.set(notice.sourceId, notice));
             return result;
         },
         async fetchNoticeDetails(id) {
-            const notice = noticesById.get(id) ?? LH_FIXTURE.find((fixture) => fixture.sourceId === id);
+            const notice = noticesById.get(id) ?? (useFixtureFallback ? LH_FIXTURE.find((fixture) => fixture.sourceId === id) : undefined);
             if (!notice?.sourceUrl) {
                 return notice ?? null;
             }

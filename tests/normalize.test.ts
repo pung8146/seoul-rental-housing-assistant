@@ -293,6 +293,18 @@ describe('adapter contract', () => {
     ]);
   });
 
+  it('does not fall back to LH fixture notices when live parsing returns no rows', async () => {
+    const adapter = createLhAdapter({
+      fetch: async () =>
+        new Response('<table><tbody><tr><td>검색 결과가 없습니다.</td></tr></tbody></table>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }),
+    });
+
+    await expect(adapter.fetchNotices()).resolves.toEqual([]);
+  });
+
   it('parses current LH list rows without treating attachment text as region', () => {
     const html = `
       <table>
@@ -757,6 +769,18 @@ describe('adapter contract', () => {
         ],
       },
     ]);
+  });
+
+  it('does not fall back to SH fixture notices when live parsing returns no rows', async () => {
+    const adapter = createShAdapter({
+      fetch: async () =>
+        new Response('<table><tbody><tr><td>검색 결과가 없습니다.</td></tr></tbody></table>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }),
+    });
+
+    await expect(adapter.fetchNotices()).resolves.toEqual([]);
   });
 
   it('parses SH detail pages into attachment metadata', () => {

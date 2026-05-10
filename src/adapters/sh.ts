@@ -11,6 +11,7 @@ type ShFetch = typeof fetch;
 
 export type CreateShAdapterOptions = {
   fetch?: ShFetch;
+  useFixtureFallback?: boolean;
 };
 
 const extractCells = (rowHtml: string): string[] => {
@@ -170,6 +171,7 @@ const SH_FIXTURE: RawNoticeCandidate[] = [
 
 export const createShAdapter = (options: CreateShAdapterOptions = {}): SourceAdapter => {
   const fetchImpl = options.fetch ?? fetch;
+  const useFixtureFallback = options.useFixtureFallback ?? false;
   const noticesById = new Map<string, RawNoticeCandidate>();
 
   return {
@@ -178,13 +180,13 @@ export const createShAdapter = (options: CreateShAdapterOptions = {}): SourceAda
       const response = await fetchImpl(SH_NOTICE_LIST_URL);
       const html = await response.text();
       const notices = parseShNoticeListHtml(html);
-      const result = notices.length > 0 ? notices : SH_FIXTURE;
+      const result = notices.length > 0 || !useFixtureFallback ? notices : SH_FIXTURE;
       noticesById.clear();
       result.forEach((notice) => noticesById.set(notice.sourceId, notice));
       return result;
     },
     async fetchNoticeDetails(id: string) {
-      const notice = noticesById.get(id) ?? SH_FIXTURE.find((fixture) => fixture.sourceId === id);
+      const notice = noticesById.get(id) ?? (useFixtureFallback ? SH_FIXTURE.find((fixture) => fixture.sourceId === id) : undefined);
       if (!notice?.sourceUrl) {
         return notice ?? null;
       }

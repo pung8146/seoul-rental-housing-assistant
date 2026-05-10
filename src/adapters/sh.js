@@ -135,6 +135,7 @@ const SH_FIXTURE = [
 ];
 export const createShAdapter = (options = {}) => {
     const fetchImpl = options.fetch ?? fetch;
+    const useFixtureFallback = options.useFixtureFallback ?? false;
     const noticesById = new Map();
     return {
         source: 'sh',
@@ -142,13 +143,13 @@ export const createShAdapter = (options = {}) => {
             const response = await fetchImpl(SH_NOTICE_LIST_URL);
             const html = await response.text();
             const notices = parseShNoticeListHtml(html);
-            const result = notices.length > 0 ? notices : SH_FIXTURE;
+            const result = notices.length > 0 || !useFixtureFallback ? notices : SH_FIXTURE;
             noticesById.clear();
             result.forEach((notice) => noticesById.set(notice.sourceId, notice));
             return result;
         },
         async fetchNoticeDetails(id) {
-            const notice = noticesById.get(id) ?? SH_FIXTURE.find((fixture) => fixture.sourceId === id);
+            const notice = noticesById.get(id) ?? (useFixtureFallback ? SH_FIXTURE.find((fixture) => fixture.sourceId === id) : undefined);
             if (!notice?.sourceUrl) {
                 return notice ?? null;
             }

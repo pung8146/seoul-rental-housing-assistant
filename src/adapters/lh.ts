@@ -11,6 +11,7 @@ type LhFetch = typeof fetch;
 
 export type CreateLhAdapterOptions = {
   fetch?: LhFetch;
+  useFixtureFallback?: boolean;
 };
 
 const extractCells = (rowHtml: string): string[] => {
@@ -303,6 +304,7 @@ const LH_FIXTURE: RawNoticeCandidate[] = [
 
 export const createLhAdapter = (options: CreateLhAdapterOptions = {}): SourceAdapter => {
   const fetchImpl = options.fetch ?? fetch;
+  const useFixtureFallback = options.useFixtureFallback ?? false;
   const noticesById = new Map<string, RawNoticeCandidate>();
 
   return {
@@ -311,13 +313,13 @@ export const createLhAdapter = (options: CreateLhAdapterOptions = {}): SourceAda
       const response = await fetchImpl(LH_NOTICE_LIST_URL);
       const html = await response.text();
       const notices = parseLhNoticeListHtml(html);
-      const result = notices.length > 0 ? notices : LH_FIXTURE;
+      const result = notices.length > 0 || !useFixtureFallback ? notices : LH_FIXTURE;
       noticesById.clear();
       result.forEach((notice) => noticesById.set(notice.sourceId, notice));
       return result;
     },
     async fetchNoticeDetails(id: string) {
-      const notice = noticesById.get(id) ?? LH_FIXTURE.find((fixture) => fixture.sourceId === id);
+      const notice = noticesById.get(id) ?? (useFixtureFallback ? LH_FIXTURE.find((fixture) => fixture.sourceId === id) : undefined);
       if (!notice?.sourceUrl) {
         return notice ?? null;
       }
