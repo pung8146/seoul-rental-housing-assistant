@@ -40,4 +40,46 @@ describe('createDashboardServer', () => {
             });
         }
     });
+    it('saves a personal profile from the dashboard form', async () => {
+        const repository = createRepository(':memory:');
+        const server = createDashboardServer({ repository });
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+            throw new Error('missing server address');
+        }
+        try {
+            const response = await fetch(`http://127.0.0.1:${address.port}/profile`, {
+                method: 'POST',
+                body: new URLSearchParams({
+                    birthYear: '1995',
+                    isHomeless: 'true',
+                    residenceRegion: '서울',
+                    householdSize: '1',
+                    monthlyIncome: '2500000',
+                    totalAssets: '50000000',
+                    vehicleValue: '0',
+                    interestTags: '청년, 행복주택',
+                }),
+                redirect: 'manual',
+            });
+            expect(response.status).toBe(303);
+            expect(response.headers.get('location')).toBe('/');
+            expect(repository.getPersonalProfile()).toEqual({
+                birthYear: 1995,
+                isHomeless: true,
+                residenceRegion: '서울',
+                householdSize: 1,
+                monthlyIncome: 2500000,
+                totalAssets: 50000000,
+                vehicleValue: 0,
+                interestTags: ['청년', '행복주택'],
+            });
+        }
+        finally {
+            await new Promise((resolve, reject) => {
+                server.close((error) => (error ? reject(error) : resolve()));
+            });
+        }
+    });
 });

@@ -15,9 +15,58 @@ const sendNotFound = (response) => {
     });
     response.end('Not found');
 };
+const redirectHome = (response) => {
+    response.writeHead(303, { location: '/' });
+    response.end();
+};
 const toUrl = (request) => new URL(request.url ?? '/', 'http://127.0.0.1');
-export const createDashboardServer = ({ repository }) => createServer((request, response) => {
+const readBody = async (request) => {
+    const chunks = [];
+    for await (const chunk of request) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString('utf8');
+};
+const parseNullableNumber = (value) => {
+    const normalized = value?.replace(/,/g, '').trim() ?? '';
+    if (!normalized) {
+        return null;
+    }
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+const parseNullableInteger = (value) => {
+    const parsed = parseNullableNumber(value);
+    return parsed === null ? null : Math.trunc(parsed);
+};
+const parseNullableString = (value) => {
+    const trimmed = value?.trim() ?? '';
+    return trimmed.length > 0 ? trimmed : null;
+};
+const parseInterestTags = (value) => (value ?? '')
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+const parseProfileForm = (body) => {
+    const params = new URLSearchParams(body);
+    return {
+        birthYear: parseNullableInteger(params.get('birthYear')),
+        isHomeless: params.get('isHomeless') === 'true',
+        residenceRegion: parseNullableString(params.get('residenceRegion')),
+        householdSize: parseNullableInteger(params.get('householdSize')),
+        monthlyIncome: parseNullableNumber(params.get('monthlyIncome')),
+        totalAssets: parseNullableNumber(params.get('totalAssets')),
+        vehicleValue: parseNullableNumber(params.get('vehicleValue')),
+        interestTags: parseInterestTags(params.get('interestTags')),
+    };
+};
+export const createDashboardServer = ({ repository }) => createServer(async (request, response) => {
     const url = toUrl(request);
+    if (request.method === 'POST' && url.pathname === '/profile') {
+        repository.savePersonalProfile(parseProfileForm(await readBody(request)));
+        redirectHome(response);
+        return;
+    }
     if (url.pathname !== '/') {
         sendNotFound(response);
         return;

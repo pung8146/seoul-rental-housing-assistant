@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import { createRepository, type Repository } from '../db/repository.js';
+import type { PersonalProfile } from '../types.js';
 import { buildDashboardView } from './dashboard-view.js';
 import { renderDashboardHtml } from './dashboard-render.js';
 
@@ -23,12 +24,72 @@ const sendNotFound = (response: ServerResponse): void => {
   response.end('Not found');
 };
 
+const redirectHome = (response: ServerResponse): void => {
+  response.writeHead(303, { location: '/' });
+  response.end();
+};
+
 const toUrl = (request: IncomingMessage): URL =>
   new URL(request.url ?? '/', 'http://127.0.0.1');
 
+const readBody = async (request: IncomingMessage): Promise<string> => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf8');
+};
+
+const parseNullableNumber = (value: string | null): number | null => {
+  const normalized = value?.replace(/,/g, '').trim() ?? '';
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseNullableInteger = (value: string | null): number | null => {
+  const parsed = parseNullableNumber(value);
+  return parsed === null ? null : Math.trunc(parsed);
+};
+
+const parseNullableString = (value: string | null): string | null => {
+  const trimmed = value?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const parseInterestTags = (value: string | null): string[] =>
+  (value ?? '')
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+
+const parseProfileForm = (body: string): PersonalProfile => {
+  const params = new URLSearchParams(body);
+  return {
+    birthYear: parseNullableInteger(params.get('birthYear')),
+    isHomeless: params.get('isHomeless') === 'true',
+    residenceRegion: parseNullableString(params.get('residenceRegion')),
+    householdSize: parseNullableInteger(params.get('householdSize')),
+    monthlyIncome: parseNullableNumber(params.get('monthlyIncome')),
+    totalAssets: parseNullableNumber(params.get('totalAssets')),
+    vehicleValue: parseNullableNumber(params.get('vehicleValue')),
+    interestTags: parseInterestTags(params.get('interestTags')),
+  };
+};
+
 export const createDashboardServer = ({ repository }: CreateDashboardServerInput) =>
-  createServer((request, response) => {
+  createServer(async (request, response) => {
     const url = toUrl(request);
+
+    if (request.method === 'POST' && url.pathname === '/profile') {
+      repository.savePersonalProfile(parseProfileForm(await readBody(request)));
+      redirectHome(response);
+      return;
+    }
+
     if (url.pathname !== '/') {
       sendNotFound(response);
       return;
