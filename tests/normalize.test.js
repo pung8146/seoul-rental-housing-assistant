@@ -427,6 +427,54 @@ describe('adapter contract', () => {
             },
         });
     });
+    it('extracts LH detail attachments and marks the primary application notice file', () => {
+        const notice = {
+            sourceId: '2015122300019918',
+            title: '서울 청년 매입임대주택 입주자 모집공고',
+            status: '공고중',
+            region: '서울',
+            postedAt: '2026-05-08',
+            sourceUrl: 'https://apply.lh.or.kr/detail',
+            metadata: {
+                provider: 'LH',
+                rawIds: { dataId1: '2015122300019918' },
+            },
+            listings: [
+                {
+                    title: '서울 청년 매입임대주택 입주자 모집공고',
+                    supplyType: '매입임대',
+                    region: '서울',
+                    status: '공고중',
+                },
+            ],
+        };
+        const html = `
+      <div class="file">
+        <a href="/lhapply/fileDownload.do?atchFileId=abc&amp;fileSn=1">서울 청년 매입임대주택 입주자 모집공고문.pdf</a>
+        <a href="https://apply.lh.or.kr/files/guide.xlsx">공급대상 목록.xlsx</a>
+      </div>
+    `;
+        expect(parseLhNoticeDetailHtml(html, notice)).toMatchObject({
+            metadata: {
+                provider: 'LH',
+                rawIds: { dataId1: '2015122300019918' },
+                attachments: [
+                    {
+                        title: '서울 청년 매입임대주택 입주자 모집공고문.pdf',
+                        url: 'https://apply.lh.or.kr/lhapply/fileDownload.do?atchFileId=abc&fileSn=1',
+                    },
+                    {
+                        title: '공급대상 목록.xlsx',
+                        url: 'https://apply.lh.or.kr/files/guide.xlsx',
+                    },
+                ],
+                primaryApplicationAttachment: {
+                    title: '서울 청년 매입임대주택 입주자 모집공고문.pdf',
+                    url: 'https://apply.lh.or.kr/lhapply/fileDownload.do?atchFileId=abc&fileSn=1',
+                },
+            },
+        });
+    });
     it('fetches LH notice details from the list-provided detail URL', async () => {
         const listHtml = `
       <table>

@@ -1,7 +1,9 @@
+import { findPrimaryApplicationAttachment } from '../domain/attachments.js';
 import { extractEligibilityRequirementsFromText } from '../domain/requirements.js';
 const LH_PROVIDER = 'LH';
 const LH_NOTICE_LIST_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?mi=1026';
 const LH_NOTICE_DETAIL_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do';
+const LH_ORIGIN = 'https://apply.lh.or.kr';
 const extractCells = (rowHtml) => {
     const matches = Array.from(rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi));
     return matches.map((match) => stripHtml(match[1]));
@@ -14,9 +16,25 @@ const stripHtml = (html) => {
     const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
     return withoutScripts.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
 };
+const decodeHtmlEntities = (value) => value
+    .replace(/&amp;/gi, '&')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+const toAbsoluteLhUrl = (url) => {
+    const decodedUrl = decodeHtmlEntities(url);
+    try {
+        return new URL(decodedUrl, LH_ORIGIN).toString();
+    }
+    catch {
+        return decodedUrl;
+    }
+};
 const extractAttribute = (html, name) => {
     const match = html.match(new RegExp(`${name}=["']([^"']*)["']`, 'i'));
-    return match?.[1] ?? null;
+    return match ? decodeHtmlEntities(match[1] ?? '') : null;
 };
 const extractAnchorText = (rowHtml) => {
     const anchorMatch = rowHtml.match(/<([a-z]+)\b[^>]*class=["'][^"']*wrtancInfoBtn[^"']*["'][^>]*>([\s\S]*?)<\/\1>/i);
@@ -39,6 +57,23 @@ const extractEligibilityRequirements = (html) => {
     const text = stripHtml(html);
     return extractEligibilityRequirementsFromText(text);
 };
+const isAttachmentLink = (title, url) => {
+    const lowerUrl = url.toLowerCase();
+    return (/\.(pdf|hwp|hwpx|doc|docx|xls|xlsx|zip)(\?|#|$)/i.test(lowerUrl) ||
+        lowerUrl.includes('filedownload') ||
+        lowerUrl.includes('download') ||
+        title.includes('공고문') ||
+        title.includes('첨부') ||
+        title.includes('공급대상'));
+};
+const extractAttachments = (html) => Array.from(html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi))
+    .map((match) => {
+    const url = toAbsoluteLhUrl(match[1] ?? '');
+    const title = decodeHtmlEntities(stripHtml(match[2] ?? ''));
+    return { title, url };
+})
+    .filter((attachment) => attachment.title.length > 0 && attachment.url.length > 0)
+    .filter((attachment) => isAttachmentLink(attachment.title, attachment.url));
 const compactRawIds = (ids) => Object.fromEntries(Object.entries(ids).filter(([, value]) => value.length > 0));
 const buildLhNoticeDetailUrl = (rawIds) => {
     const panId = rawIds.dataId1;
@@ -127,6 +162,8 @@ export const parseLhNoticeDetailHtml = (html, notice) => {
     const buildings = extractDetailBuildings(html);
     const applicationPeriod = extractApplicationPeriod(html);
     const eligibilityRequirements = extractEligibilityRequirements(html);
+    const attachments = extractAttachments(html);
+    const primaryApplicationAttachment = findPrimaryApplicationAttachment(attachments);
     const listings = tables.flatMap((tableMatch, tableIndex) => {
         const tableHtml = tableMatch[0];
         const headers = Array.from(tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))
@@ -170,6 +207,8 @@ export const parseLhNoticeDetailHtml = (html, notice) => {
         ...applicationPeriod,
         metadata: {
             ...(notice.metadata ?? {}),
+            ...(attachments.length > 0 ? { attachments } : {}),
+            ...(primaryApplicationAttachment ? { primaryApplicationAttachment } : {}),
             ...(eligibilityRequirements ? { eligibilityRequirements } : {}),
         },
         listings: listings.length > 0 ? listings : notice.listings,
