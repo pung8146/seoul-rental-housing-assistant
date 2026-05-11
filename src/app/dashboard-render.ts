@@ -149,6 +149,9 @@ const inferNoticeTypeLabels = (notice: Pick<Notice, 'title' | 'targetTags'>): st
   return labels.length > 0 ? labels : ['유형확인'];
 };
 
+const isSaleNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
+  inferNoticeTypeLabels(notice).includes('분양');
+
 type ApplicationStatus = {
   className: 'available' | 'upcoming' | 'posted' | 'closed' | 'unknown';
   label: '신청가능' | '접수예정' | '공고중' | '마감' | '확인필요';
@@ -449,6 +452,58 @@ const renderPreparationChecklist = (
   `;
 };
 
+const renderSalePreparationChecklist = (notice: Pick<Notice, 'title' | 'targetTags'>): string => {
+  if (!isSaleNotice(notice)) {
+    return '';
+  }
+
+  const hasNewlywedTarget = [notice.title, ...notice.targetTags].join(' ').includes('신혼');
+  const items: PreparationItem[] = [
+    {
+      label: '청약통장',
+      status: 'review',
+      value: '가입기간/납입횟수 확인',
+    },
+    {
+      label: '무주택세대',
+      status: 'review',
+      value: '세대구성원 기준 확인',
+    },
+    {
+      label: '거주지역',
+      status: 'review',
+      value: '해당지역/기타지역 확인',
+    },
+    {
+      label: '특별공급',
+      status: hasNewlywedTarget ? 'review' : 'missing',
+      value: hasNewlywedTarget ? '신혼부부 조건 확인' : '대상 여부 확인',
+    },
+  ];
+
+  return `
+    <div class="sale-prep">
+      <div class="sale-prep-header">
+        <h3>분양 확인 항목</h3>
+        <p>분양 공고는 청약 자격을 공고문 기준으로 최종 확인해야 합니다.</p>
+      </div>
+      <div class="preparation-checklist sale-checklist">
+        ${items
+          .map(
+            (item) => `
+              <div class="preparation-item ${item.status}">
+                <span>${escapeHtml(item.label)}</span>
+                <strong>${escapeHtml(item.value)}</strong>
+                <em>${escapeHtml(preparationStatusLabel(item.status))}</em>
+              </div>
+            `,
+          )
+          .join('')}
+      </div>
+    </div>
+  `;
+};
+
 const renderApplicationPreparation = (
   notice: Notice,
   listings: Listing[],
@@ -477,6 +532,7 @@ const renderApplicationPreparation = (
         <h3>필요 확인 항목</h3>
         ${renderPreparationChecklist(notice, listings, attachments)}
       </div>
+      ${renderSalePreparationChecklist(notice)}
     </section>
   `;
 };
@@ -1033,6 +1089,23 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       margin-top: 8px;
+    }
+    .sale-prep {
+      display: grid;
+      gap: 8px;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff7ed;
+    }
+    .sale-prep-header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .sale-checklist {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 0;
     }
     .preparation-item {
       display: grid;

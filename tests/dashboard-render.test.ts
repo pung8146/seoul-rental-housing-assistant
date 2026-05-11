@@ -300,6 +300,21 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('href="/?notice=lh%3Anotice-1&amp;type=sale"');
     expect(html).toContain('<span class="type-badge">분양</span>');
     expect(html).toContain('<span class="type-badge">신혼부부</span>');
+    expect(html).toContain('분양 확인 항목');
+    expect(html).toContain('분양 공고는 청약 자격을 공고문 기준으로 최종 확인해야 합니다.');
+    expect(html).toContain('<span>청약통장</span>');
+    expect(html).toContain('<strong>가입기간/납입횟수 확인</strong>');
+    expect(html).toContain('<span>무주택세대</span>');
+    expect(html).toContain('<span>거주지역</span>');
+    expect(html).toContain('<span>특별공급</span>');
+    expect(html).toContain('<strong>신혼부부 조건 확인</strong>');
+  });
+
+  it('does not render sale-specific preparation for rental notices', () => {
+    const html = renderDashboardHtml(view);
+
+    expect(html).not.toContain('분양 확인 항목');
+    expect(html).not.toContain('<span>청약통장</span>');
   });
 
   it('opens the profile filter by default when no profile is saved', () => {
