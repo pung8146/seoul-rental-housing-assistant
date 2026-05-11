@@ -217,6 +217,54 @@ describe('adapter contract', () => {
     ]);
   });
 
+  it('keeps LH sale housing rows while dropping non-housing supply rows from the integrated list', () => {
+    const html = `
+      <table>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>분양주택</td>
+            <td>
+              <a href="javascript:" data-id1="sale-1" data-id2="03" data-id3="01" data-id4="02" class="wrtancInfoBtn">
+                <span>남양주왕숙2 A-3BL 공공분양주택 입주자모집공고</span>
+              </a>
+            </td>
+            <td>경기도</td>
+            <td>2026.05.11</td>
+            <td>2026.05.30</td>
+            <td>공고중</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>토지</td>
+            <td>
+              <a href="javascript:" data-id1="land-1" data-id2="03" data-id3="01" data-id4="02" class="wrtancInfoBtn">
+                <span>공동주택용지 공급공고</span>
+              </a>
+            </td>
+            <td>경기도</td>
+            <td>2026.05.11</td>
+            <td>2026.05.30</td>
+            <td>공고중</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    expect(parseLhNoticeListHtml(html)).toEqual([
+      expect.objectContaining({
+        sourceId: 'sale-1',
+        title: '남양주왕숙2 A-3BL 공공분양주택 입주자모집공고',
+        region: '경기도',
+        listings: [
+          expect.objectContaining({
+            supplyType: '분양주택',
+          }),
+        ],
+      }),
+    ]);
+  });
+
   it('fetches live LH notice HTML with an injected fetch implementation', async () => {
     const html = `
       <table>
@@ -255,7 +303,7 @@ describe('adapter contract', () => {
     const notices = await adapter.fetchNotices();
     expect(fetchCalls).toEqual([
       {
-        input: 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?mi=1026',
+        input: 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?viewType=srch',
         init: undefined,
       },
     ]);
@@ -1158,7 +1206,7 @@ describe('normalization helpers', () => {
     expect(result.notices).toHaveLength(1);
     expect(result.listings).toHaveLength(1);
     expect(NoticeSchema.parse(result.notices[0]).region).toBe('서울');
-    expect(NoticeSchema.parse(result.notices[0]).targetTags).toEqual(['청년', '신혼부부']);
+    expect(NoticeSchema.parse(result.notices[0]).targetTags).toEqual(['청년', '신혼부부', '행복주택']);
 
     const listing = ListingSchema.parse(result.listings[0]);
     expect(listing.noticeSourceId).toBe('notice-1');
@@ -1229,6 +1277,29 @@ describe('normalization helpers', () => {
     expect(listing.monthlyRent).toBeNull();
     expect(listing.floorAreaM2).toBeNull();
     expect(listing.status).toBeNull();
+  });
+
+  it('derives 분양 and 신혼부부 target tags from notice titles and listing supply types', () => {
+    const result = normalizeAdapterOutput({
+      source: 'lh',
+      notices: [
+        {
+          sourceId: 'sale-1',
+          title: '위례 A1-1BL 공공분양주택 분양공고',
+          region: '서울특별시',
+          listings: [
+            {
+              title: '신혼부부 특별공급',
+              supplyType: '공공분양',
+              region: '서울특별시',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(NoticeSchema.parse(result.notices[0]).targetTags).toEqual(['분양', '신혼부부']);
+    expect(ListingSchema.parse(result.listings[0]).targetTags).toEqual(['분양', '신혼부부']);
   });
 
   it('normalizes region text like 서울특별시 to 서울', () => {

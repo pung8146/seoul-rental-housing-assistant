@@ -1,5 +1,12 @@
 const normalizeTitle = (title) => title.replace(/\s+/g, ' ').trim();
-const ACTIONABLE_TITLE_PATTERNS = [/모집\s*공고/, /입주자\s*모집/, /예비입주자\s*모집/, /추가\s*모집/];
+const ACTIONABLE_TITLE_PATTERNS = [
+    /모집\s*공고/,
+    /입주자\s*모집/,
+    /예비입주자\s*모집/,
+    /추가\s*모집/,
+    /분양\s*공고/,
+    /(공공분양|분양주택|사전청약).*(공고|모집)/,
+];
 const SERVICE_NOTICE_PATTERNS = [/전산\s*작업/, /서비스.*안내/];
 const APPLICATION_RESULT_PATTERNS = [
     /청약\s*접수\s*결과/,

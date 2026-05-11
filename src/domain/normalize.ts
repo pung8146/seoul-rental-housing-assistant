@@ -91,6 +91,46 @@ export const parseTags = (value: unknown): string[] => {
 
 const nullableText = (value: unknown): string | null => cleanupText(value);
 
+const uniqueTags = (tags: string[]): string[] => Array.from(new Set(tags));
+
+export const deriveTargetTags = (...values: unknown[]): string[] => {
+  const text = values
+    .map((value) => cleanupText(value))
+    .filter((value): value is string => value != null)
+    .join(' ');
+  const tags: string[] = [];
+
+  if (/분양|공공분양|분양주택|사전청약/.test(text)) {
+    tags.push('분양');
+  }
+  if (/신혼|신혼부부/.test(text)) {
+    tags.push('신혼부부');
+  }
+  if (/청년|대학생/.test(text)) {
+    tags.push('청년');
+  }
+  if (/행복주택/.test(text)) {
+    tags.push('행복주택');
+  }
+  if (/매입임대/.test(text)) {
+    tags.push('매입임대');
+  }
+  if (/전세임대/.test(text)) {
+    tags.push('전세임대');
+  }
+  if (/국민임대/.test(text)) {
+    tags.push('국민임대');
+  }
+  if (/장기전세/.test(text)) {
+    tags.push('장기전세');
+  }
+  if (/공공임대/.test(text)) {
+    tags.push('공공임대');
+  }
+
+  return uniqueTags(tags);
+};
+
 export const normalizeAdapterOutput = ({ source, notices }: RawAdapterOutput): { notices: Notice[]; listings: Listing[] } => {
   const normalizedNotices: Notice[] = [];
   const normalizedListings: Listing[] = [];
@@ -98,6 +138,11 @@ export const normalizeAdapterOutput = ({ source, notices }: RawAdapterOutput): {
   for (const rawNotice of notices) {
     const sourceId = cleanupText(rawNotice.sourceId) ?? '';
     const title = cleanupText(rawNotice.title) ?? '';
+    const listingTagTexts = (rawNotice.listings ?? []).flatMap((listing) => [
+      listing.title,
+      listing.supplyType,
+      listing.targetTags,
+    ]);
 
     const notice: Notice = {
       source,
@@ -107,7 +152,7 @@ export const normalizeAdapterOutput = ({ source, notices }: RawAdapterOutput): {
       changeHash: '',
       status: nullableText(rawNotice.status),
       region: normalizeRegion(rawNotice.region),
-      targetTags: parseTags(rawNotice.targetTags),
+      targetTags: uniqueTags([...parseTags(rawNotice.targetTags), ...deriveTargetTags(title, ...listingTagTexts)]),
       postedAt: nullableText(rawNotice.postedAt),
       applicationStartAt: nullableText(rawNotice.applicationStartAt),
       applicationEndAt: nullableText(rawNotice.applicationEndAt),
@@ -121,15 +166,20 @@ export const normalizeAdapterOutput = ({ source, notices }: RawAdapterOutput): {
     normalizedNotices.push(notice);
 
     for (const rawListing of rawNotice.listings ?? []) {
+      const listingTitle = cleanupText(rawListing.title) ?? '';
+      const listingSupplyType = nullableText(rawListing.supplyType);
       const listingBase: Listing = {
         source,
         noticeSourceId: sourceId,
-        title: cleanupText(rawListing.title) ?? '',
+        title: listingTitle,
         stableKey: '',
         changeHash: '',
-        supplyType: nullableText(rawListing.supplyType),
+        supplyType: listingSupplyType,
         region: normalizeRegion(rawListing.region),
-        targetTags: parseTags(rawListing.targetTags),
+        targetTags: uniqueTags([
+          ...parseTags(rawListing.targetTags),
+          ...deriveTargetTags(title, listingTitle, listingSupplyType),
+        ]),
         deposit: parseNumber(rawListing.deposit),
         monthlyRent: parseNumber(rawListing.monthlyRent),
         floorAreaM2: parseNumber(rawListing.floorAreaM2),

@@ -1,7 +1,7 @@
 import { findPrimaryApplicationAttachment } from '../domain/attachments.js';
 import { extractEligibilityRequirementsFromText } from '../domain/requirements.js';
 const LH_PROVIDER = 'LH';
-const LH_NOTICE_LIST_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?mi=1026';
+const LH_NOTICE_LIST_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancList.do?viewType=srch';
 const LH_NOTICE_DETAIL_URL = 'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do';
 const LH_ORIGIN = 'https://apply.lh.or.kr';
 const extractCells = (rowHtml) => {
@@ -49,6 +49,7 @@ const normalizeNoticeTitle = (value) => value
 const DATE_TEXT_PATTERN = /(\d{4})\s*(?:년|[-.])\s*(\d{1,2})\s*(?:월|[-.])\s*(\d{1,2})\s*일?/g;
 const isDateCell = (value) => /^\d{4}[-.]\d{2}[-.]\d{2}$/.test(value);
 const normalizeLhDate = (value) => value.replace(/\./g, '-');
+const isSupportedLhSupplyType = (value) => /임대|행복주택|분양주택|공공분양|신혼희망|사전청약/.test(value) && !/상가|토지|어린이집/.test(value);
 const normalizeDateMatch = (match) => `${match[1]}-${(match[2] ?? '').padStart(2, '0')}-${(match[3] ?? '').padStart(2, '0')}`;
 const extractDates = (text) => Array.from(text.matchAll(DATE_TEXT_PATTERN)).map((match) => normalizeDateMatch(match));
 const extractApplicationPeriod = (html) => {
@@ -136,6 +137,9 @@ export const parseLhNoticeListHtml = (html) => {
         const applicationEndAt = normalizeLhDate(cells.find((cell, index) => index > postedAtIndex && isDateCell(cell)) ?? '');
         const status = cells[postedAtIndex + 2] ?? cells[postedAtIndex + 1] ?? '';
         const rawIds = compactRawIds({ dataId1, dataId2, dataId3, dataId4 });
+        if (!isSupportedLhSupplyType(supplyType)) {
+            continue;
+        }
         notices.push({
             sourceId: dataId1,
             title,

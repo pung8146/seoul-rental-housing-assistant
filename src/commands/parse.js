@@ -12,6 +12,9 @@ const SOURCE_ALIASES = {
 const normalizeWhitespace = (value) => value.trim().replace(/\s+/g, ' ');
 const normalizeRegion = (value) => REGION_ALIASES[value] ?? value;
 const normalizeSource = (value) => SOURCE_ALIASES[value.trim().toLowerCase()] ?? value.trim().toLowerCase();
+const addTargetTag = (filters, tag) => {
+    filters.targetTags = Array.from(new Set([...(filters.targetTags ?? []), tag]));
+};
 const parseStructuredFilters = (input) => {
     const filters = {};
     const segments = input
@@ -19,7 +22,7 @@ const parseStructuredFilters = (input) => {
         .map((segment) => normalizeWhitespace(segment))
         .filter(Boolean);
     for (const segment of segments) {
-        const match = segment.match(/^(지역|상태|기관)\s+(.+)$/);
+        const match = segment.match(/^(지역|상태|기관|유형|대상)\s+(.+)$/);
         if (!match) {
             continue;
         }
@@ -34,6 +37,41 @@ const parseStructuredFilters = (input) => {
         else if (key === '기관') {
             filters.source = normalizeSource(value);
         }
+        else if (key === '유형' || key === '대상') {
+            addTargetTag(filters, value);
+        }
+    }
+    return filters;
+};
+const parseNaturalFilters = (input) => {
+    const filters = {};
+    const regionMatch = input.match(/(서울(?:특별시|시)?|경기(?:도)?)/);
+    if (regionMatch) {
+        filters.region = normalizeRegion(regionMatch[1]);
+    }
+    if (/분양|공공분양|분양주택|사전청약/.test(input)) {
+        addTargetTag(filters, '분양');
+    }
+    if (/신혼|신혼부부/.test(input)) {
+        addTargetTag(filters, '신혼부부');
+    }
+    if (/청년|대학생/.test(input)) {
+        addTargetTag(filters, '청년');
+    }
+    if (/행복주택/.test(input)) {
+        addTargetTag(filters, '행복주택');
+    }
+    if (/매입임대/.test(input)) {
+        addTargetTag(filters, '매입임대');
+    }
+    if (/전세임대/.test(input)) {
+        addTargetTag(filters, '전세임대');
+    }
+    if (/국민임대/.test(input)) {
+        addTargetTag(filters, '국민임대');
+    }
+    if (/장기전세/.test(input)) {
+        addTargetTag(filters, '장기전세');
     }
     return filters;
 };
@@ -62,13 +100,11 @@ export const parseCommand = (input) => {
             },
         };
     }
-    const regionMatch = normalized.match(/(서울(?:특별시|시)?|경기(?:도)?)/);
-    if (regionMatch) {
+    const naturalFilters = parseNaturalFilters(normalized);
+    if (Object.keys(naturalFilters).length > 0) {
         return {
             intent: 'list',
-            filters: {
-                region: normalizeRegion(regionMatch[1]),
-            },
+            filters: naturalFilters,
         };
     }
     return {

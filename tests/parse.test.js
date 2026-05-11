@@ -18,13 +18,29 @@ describe('parseCommand', () => {
             },
         });
     });
+    it('parses natural housing type filters together with region filters', () => {
+        expect(parseCommand('서울 분양 공고 보여줘')).toEqual({
+            intent: 'list',
+            filters: {
+                region: '서울',
+                targetTags: ['분양'],
+            },
+        });
+        expect(parseCommand('신혼부부 공고 보여줘')).toEqual({
+            intent: 'list',
+            filters: {
+                targetTags: ['신혼부부'],
+            },
+        });
+    });
     it('parses slash-separated structured filters', () => {
-        expect(parseCommand('공고 조회 / 지역 경기 / 상태 모집중 / 기관 SH')).toEqual({
+        expect(parseCommand('공고 조회 / 지역 경기 / 상태 모집중 / 기관 SH / 유형 분양')).toEqual({
             intent: 'list',
             filters: {
                 region: '경기',
                 status: '모집중',
                 source: 'sh',
+                targetTags: ['분양'],
             },
         });
     });

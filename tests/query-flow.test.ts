@@ -131,6 +131,33 @@ describe('runQuery', () => {
     expect(
       getNoticeExclusionReason({ title: '[서울지역본부] 집주인 임대주택 예비입주자 모집공고(건설개량형)' }),
     ).toBeNull();
+    expect(getNoticeExclusionReason({ title: '위례 A1-1BL 공공분양주택 분양공고' })).toBeNull();
+  });
+
+  it('returns only sale notices when filtering by 분양 target tag', () => {
+    const repository = createRepository(':memory:');
+    const saleNotice = makeNotice(1, {
+      title: '위례 A1-1BL 공공분양주택 분양공고',
+      targetTags: ['분양', '신혼부부'],
+      postedAt: '2026-05-10',
+    });
+    const rentalNotice = makeNotice(2, {
+      title: '서울 청년 매입임대주택 입주자 모집공고',
+      targetTags: ['청년', '매입임대'],
+      postedAt: '2026-05-09',
+    });
+
+    repository.upsertNotice(saleNotice);
+    repository.upsertNotice(rentalNotice);
+
+    const result = runQueryText({
+      repository,
+      input: '분양 공고 보여줘',
+    });
+
+    expect(result.lines).toHaveLength(1);
+    expect(result.text).toContain('공공분양주택 분양공고');
+    expect(result.text).not.toContain('매입임대주택');
   });
 
   it('returns a readable empty message when list filters match nothing', () => {
