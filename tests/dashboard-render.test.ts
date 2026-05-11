@@ -244,6 +244,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('href="https://example.com/file.pdf"');
     expect(html).toContain('<details class="profile-panel">');
     expect(html).toContain('<summary class="profile-summary">');
+    expect(html).toContain('name="returnTo" value="/?notice=lh%3Anotice-1"');
     expect(html).toContain('내 조건');
     expect(html).toContain('name="birthYear"');
     expect(html).toContain('value="1995"');
@@ -300,6 +301,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('<a class="active" href="/?type=sale">');
     expect(html).toContain('분양 1건');
     expect(html).toContain('href="/?notice=lh%3Anotice-1&amp;type=sale"');
+    expect(html).toContain('name="returnTo" value="/?notice=lh%3Anotice-1&amp;type=sale"');
     expect(html).toContain('<span class="type-badge">분양</span>');
     expect(html).toContain('<span class="type-badge">신혼부부</span>');
     expect(html).toContain('분양 확인 항목');

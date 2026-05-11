@@ -90,11 +90,12 @@ describe('createDashboardServer', () => {
                     subscriptionAccountMonths: '36',
                     subscriptionPaymentCount: '24',
                     interestTags: '청년, 행복주택',
+                    returnTo: '/?type=sale',
                 }),
                 redirect: 'manual',
             });
             expect(response.status).toBe(303);
-            expect(response.headers.get('location')).toBe('/');
+            expect(response.headers.get('location')).toBe('/?type=sale');
             expect(repository.getPersonalProfile()).toEqual({
                 birthYear: 1995,
                 isHomeless: true,
@@ -107,6 +108,32 @@ describe('createDashboardServer', () => {
                 subscriptionPaymentCount: 24,
                 interestTags: ['청년', '행복주택'],
             });
+        }
+        finally {
+            await new Promise((resolve, reject) => {
+                server.close((error) => (error ? reject(error) : resolve()));
+            });
+        }
+    });
+    it('falls back to home after profile save when return path is unsafe', async () => {
+        const repository = createRepository(':memory:');
+        const server = createDashboardServer({ repository });
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+            throw new Error('missing server address');
+        }
+        try {
+            const response = await fetch(`http://127.0.0.1:${address.port}/profile`, {
+                method: 'POST',
+                body: new URLSearchParams({
+                    interestTags: '청년',
+                    returnTo: '//example.com/steal',
+                }),
+                redirect: 'manual',
+            });
+            expect(response.status).toBe(303);
+            expect(response.headers.get('location')).toBe('/');
         }
         finally {
             await new Promise((resolve, reject) => {

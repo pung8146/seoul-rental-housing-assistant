@@ -24,8 +24,8 @@ const sendNotFound = (response: ServerResponse): void => {
   response.end('Not found');
 };
 
-const redirectHome = (response: ServerResponse): void => {
-  response.writeHead(303, { location: '/' });
+const redirectTo = (response: ServerResponse, location: string): void => {
+  response.writeHead(303, { location });
   response.end();
 };
 
@@ -73,19 +73,27 @@ const parseInterestTags = (value: string | null): string[] =>
     .map((tag) => tag.trim())
     .filter((tag) => tag.length > 0);
 
-const parseProfileForm = (body: string): PersonalProfile => {
+const parseReturnTo = (value: string | null): string => {
+  const trimmed = value?.trim() ?? '';
+  return trimmed.startsWith('/') && !trimmed.startsWith('//') ? trimmed : '/';
+};
+
+const parseProfileForm = (body: string): { profile: PersonalProfile; returnTo: string } => {
   const params = new URLSearchParams(body);
   return {
-    birthYear: parseNullableInteger(params.get('birthYear')),
-    isHomeless: params.get('isHomeless') === 'true',
-    residenceRegion: parseNullableString(params.get('residenceRegion')),
-    householdSize: parseNullableInteger(params.get('householdSize')),
-    monthlyIncome: parseNullableNumber(params.get('monthlyIncome')),
-    totalAssets: parseNullableNumber(params.get('totalAssets')),
-    vehicleValue: parseNullableNumber(params.get('vehicleValue')),
-    subscriptionAccountMonths: parseNullableInteger(params.get('subscriptionAccountMonths')),
-    subscriptionPaymentCount: parseNullableInteger(params.get('subscriptionPaymentCount')),
-    interestTags: parseInterestTags(params.get('interestTags')),
+    profile: {
+      birthYear: parseNullableInteger(params.get('birthYear')),
+      isHomeless: params.get('isHomeless') === 'true',
+      residenceRegion: parseNullableString(params.get('residenceRegion')),
+      householdSize: parseNullableInteger(params.get('householdSize')),
+      monthlyIncome: parseNullableNumber(params.get('monthlyIncome')),
+      totalAssets: parseNullableNumber(params.get('totalAssets')),
+      vehicleValue: parseNullableNumber(params.get('vehicleValue')),
+      subscriptionAccountMonths: parseNullableInteger(params.get('subscriptionAccountMonths')),
+      subscriptionPaymentCount: parseNullableInteger(params.get('subscriptionPaymentCount')),
+      interestTags: parseInterestTags(params.get('interestTags')),
+    },
+    returnTo: parseReturnTo(params.get('returnTo')),
   };
 };
 
@@ -94,8 +102,9 @@ export const createDashboardServer = ({ repository }: CreateDashboardServerInput
     const url = toUrl(request);
 
     if (request.method === 'POST' && url.pathname === '/profile') {
-      repository.savePersonalProfile(parseProfileForm(await readBody(request)));
-      redirectHome(response);
+      const { profile, returnTo } = parseProfileForm(await readBody(request));
+      repository.savePersonalProfile(profile);
+      redirectTo(response, returnTo);
       return;
     }
 

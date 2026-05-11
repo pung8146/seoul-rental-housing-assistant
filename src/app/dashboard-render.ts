@@ -224,6 +224,9 @@ const renderProfileForm = (view: DashboardView): string => {
   const profile = view.profile;
   const interestTags = profile?.interestTags.join(', ') ?? '';
   const openAttribute = profile ? '' : ' open';
+  const returnTo = view.selectedNotice
+    ? noticeHref(view.selectedNotice.notice.noticeKey, view.filters.noticeType)
+    : noticeTypeHref(view.filters.noticeType);
 
   return `
     <section>
@@ -236,6 +239,7 @@ const renderProfileForm = (view: DashboardView): string => {
           </span>
         </summary>
         <form class="profile-form" method="post" action="/profile">
+          <input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}" />
           <label>
             <span>출생연도</span>
             <input name="birthYear" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.birthYear ?? null))}" />
