@@ -41,6 +41,8 @@ const mapPersonalProfileRow = (row) => ({
     monthlyIncome: row.monthly_income,
     totalAssets: row.total_assets,
     vehicleValue: row.vehicle_value,
+    subscriptionAccountMonths: row.subscription_account_months,
+    subscriptionPaymentCount: row.subscription_payment_count,
     interestTags: parseArray(row.interest_tags),
 });
 export const createRepository = (filename, database = createDatabase(filename)) => {
@@ -205,8 +207,9 @@ export const createRepository = (filename, database = createDatabase(filename)) 
             database
                 .prepare(`INSERT INTO personal_profile (
             id, birth_year, is_homeless, residence_region, household_size,
-            monthly_income, total_assets, vehicle_value, interest_tags
-          ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+            monthly_income, total_assets, vehicle_value, subscription_account_months,
+            subscription_payment_count, interest_tags
+          ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             birth_year = excluded.birth_year,
             is_homeless = excluded.is_homeless,
@@ -215,9 +218,11 @@ export const createRepository = (filename, database = createDatabase(filename)) 
             monthly_income = excluded.monthly_income,
             total_assets = excluded.total_assets,
             vehicle_value = excluded.vehicle_value,
+            subscription_account_months = excluded.subscription_account_months,
+            subscription_payment_count = excluded.subscription_payment_count,
             interest_tags = excluded.interest_tags,
             updated_at = CURRENT_TIMESTAMP`)
-                .run(profile.birthYear, profile.isHomeless == null ? null : profile.isHomeless ? 1 : 0, profile.residenceRegion, profile.householdSize, profile.monthlyIncome, profile.totalAssets, profile.vehicleValue, serializeArray(profile.interestTags));
+                .run(profile.birthYear, profile.isHomeless == null ? null : profile.isHomeless ? 1 : 0, profile.residenceRegion, profile.householdSize, profile.monthlyIncome, profile.totalAssets, profile.vehicleValue, profile.subscriptionAccountMonths, profile.subscriptionPaymentCount, serializeArray(profile.interestTags));
         },
         queryNotices(filters, options = {}) {
             const clauses = [];

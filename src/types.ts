@@ -52,6 +52,8 @@ export const PersonalProfileSchema = z.object({
   monthlyIncome: NullableNumber,
   totalAssets: NullableNumber,
   vehicleValue: NullableNumber,
+  subscriptionAccountMonths: z.number().int().nonnegative().nullable(),
+  subscriptionPaymentCount: z.number().int().nonnegative().nullable(),
   interestTags: z.array(z.string()),
 });
 

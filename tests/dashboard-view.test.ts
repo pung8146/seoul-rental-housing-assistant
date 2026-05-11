@@ -72,6 +72,8 @@ describe('buildDashboardView', () => {
       monthlyIncome: 2500000,
       totalAssets: 50000000,
       vehicleValue: 0,
+      subscriptionAccountMonths: 36,
+      subscriptionPaymentCount: 24,
       interestTags: ['청년'],
     });
     repository.recordSourceRun({

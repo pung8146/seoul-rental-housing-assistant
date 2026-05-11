@@ -200,6 +200,14 @@ const renderProfileForm = (view) => {
             <input name="vehicleValue" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.vehicleValue ?? null))}" />
           </label>
           <label>
+            <span>청약통장 가입기간(개월)</span>
+            <input name="subscriptionAccountMonths" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.subscriptionAccountMonths ?? null))}" />
+          </label>
+          <label>
+            <span>청약통장 납입횟수</span>
+            <input name="subscriptionPaymentCount" inputmode="numeric" value="${escapeHtml(formatInputValue(profile?.subscriptionPaymentCount ?? null))}" />
+          </label>
+          <label>
             <span>관심유형</span>
             <input name="interestTags" value="${escapeHtml(interestTags)}" placeholder="청년, 행복주택" />
           </label>
@@ -344,26 +352,31 @@ const renderPreparationChecklist = (notice, listings, attachments) => {
     </div>
   `;
 };
-const renderSalePreparationChecklist = (notice) => {
+const renderSalePreparationChecklist = (notice, profile) => {
     if (!isSaleNotice(notice)) {
         return '';
     }
     const hasNewlywedTarget = [notice.title, ...notice.targetTags].join(' ').includes('신혼');
     const items = [
         {
-            label: '청약통장',
-            status: 'review',
-            value: '가입기간/납입횟수 확인',
+            label: '청약통장 가입기간',
+            status: profile?.subscriptionAccountMonths != null ? 'ready' : 'review',
+            value: profile?.subscriptionAccountMonths != null ? `${profile.subscriptionAccountMonths}개월` : '입력 필요',
+        },
+        {
+            label: '청약통장 납입횟수',
+            status: profile?.subscriptionPaymentCount != null ? 'ready' : 'review',
+            value: profile?.subscriptionPaymentCount != null ? `${profile.subscriptionPaymentCount}회` : '입력 필요',
         },
         {
             label: '무주택세대',
-            status: 'review',
-            value: '세대구성원 기준 확인',
+            status: profile?.isHomeless === true ? 'ready' : 'review',
+            value: profile?.isHomeless === true ? '무주택 입력됨' : '세대구성원 기준 확인',
         },
         {
             label: '거주지역',
-            status: 'review',
-            value: '해당지역/기타지역 확인',
+            status: profile?.residenceRegion ? 'ready' : 'review',
+            value: profile?.residenceRegion ?? '해당지역/기타지역 확인',
         },
         {
             label: '특별공급',
@@ -391,7 +404,7 @@ const renderSalePreparationChecklist = (notice) => {
     </div>
   `;
 };
-const renderApplicationPreparation = (notice, listings, attachments) => {
+const renderApplicationPreparation = (notice, listings, attachments, profile) => {
     const primaryAttachment = getPrimaryApplicationAttachment(notice.metadata);
     return `
     <section class="application-prep">
@@ -414,7 +427,7 @@ const renderApplicationPreparation = (notice, listings, attachments) => {
         <h3>필요 확인 항목</h3>
         ${renderPreparationChecklist(notice, listings, attachments)}
       </div>
-      ${renderSalePreparationChecklist(notice)}
+      ${renderSalePreparationChecklist(notice, profile)}
     </section>
   `;
 };
@@ -1205,7 +1218,7 @@ export const renderDashboardHtml = (view) => {
                   <div class="field"><span>지원가능성</span>${renderEligibilityBadge(selectedNotice)}${renderEligibilityReasons(selectedNotice)}</div>
                 </div>
                 ${renderDetailQuality(selectedNotice, view.selectedNotice?.listings ?? [], attachments)}
-                ${renderApplicationPreparation(selectedNotice, view.selectedNotice?.listings ?? [], attachments)}
+                ${renderApplicationPreparation(selectedNotice, view.selectedNotice?.listings ?? [], attachments, view.profile)}
                 <div class="attachments">
                   ${attachments.map((attachment) => `<a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.title)}</a>`).join('')}
                 </div>

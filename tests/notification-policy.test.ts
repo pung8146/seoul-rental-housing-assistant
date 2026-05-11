@@ -12,6 +12,8 @@ const profile: PersonalProfile = {
   monthlyIncome: 2500000,
   totalAssets: 50000000,
   vehicleValue: 0,
+  subscriptionAccountMonths: 36,
+  subscriptionPaymentCount: 24,
   interestTags: ['청년'],
 };
 
@@ -92,4 +94,3 @@ describe('notification policy', () => {
     expect(summary).not.toContain('고령자 국민임대');
   });
 });
-

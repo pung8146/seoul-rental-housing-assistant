@@ -83,6 +83,8 @@ const parseProfileForm = (body: string): PersonalProfile => {
     monthlyIncome: parseNullableNumber(params.get('monthlyIncome')),
     totalAssets: parseNullableNumber(params.get('totalAssets')),
     vehicleValue: parseNullableNumber(params.get('vehicleValue')),
+    subscriptionAccountMonths: parseNullableInteger(params.get('subscriptionAccountMonths')),
+    subscriptionPaymentCount: parseNullableInteger(params.get('subscriptionPaymentCount')),
     interestTags: parseInterestTags(params.get('interestTags')),
   };
 };

@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS personal_profile (
   monthly_income REAL,
   total_assets REAL,
   vehicle_value REAL,
+  subscription_account_months INTEGER,
+  subscription_payment_count INTEGER,
   interest_tags TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
