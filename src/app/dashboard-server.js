@@ -20,6 +20,12 @@ const redirectHome = (response) => {
     response.end();
 };
 const toUrl = (request) => new URL(request.url ?? '/', 'http://127.0.0.1');
+const parseNoticeTypeFilter = (value) => {
+    if (value === 'sale' || value === 'rent' || value === 'newlywed' || value === 'youth') {
+        return value;
+    }
+    return 'all';
+};
 const readBody = async (request) => {
     const chunks = [];
     for await (const chunk of request) {
@@ -74,6 +80,7 @@ export const createDashboardServer = ({ repository }) => createServer(async (req
     const view = buildDashboardView({
         repository,
         selectedNoticeKey: url.searchParams.get('notice'),
+        noticeTypeFilter: parseNoticeTypeFilter(url.searchParams.get('type')),
     });
     sendHtml(response, renderDashboardHtml(view));
 });

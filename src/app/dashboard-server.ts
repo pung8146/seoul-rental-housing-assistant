@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 
 import { createRepository, type Repository } from '../db/repository.js';
 import type { PersonalProfile } from '../types.js';
-import { buildDashboardView } from './dashboard-view.js';
+import { buildDashboardView, type DashboardNoticeTypeFilter } from './dashboard-view.js';
 import { renderDashboardHtml } from './dashboard-render.js';
 
 type CreateDashboardServerInput = {
@@ -31,6 +31,13 @@ const redirectHome = (response: ServerResponse): void => {
 
 const toUrl = (request: IncomingMessage): URL =>
   new URL(request.url ?? '/', 'http://127.0.0.1');
+
+const parseNoticeTypeFilter = (value: string | null): DashboardNoticeTypeFilter => {
+  if (value === 'sale' || value === 'rent' || value === 'newlywed' || value === 'youth') {
+    return value;
+  }
+  return 'all';
+};
 
 const readBody = async (request: IncomingMessage): Promise<string> => {
   const chunks: Buffer[] = [];
@@ -98,6 +105,7 @@ export const createDashboardServer = ({ repository }: CreateDashboardServerInput
     const view = buildDashboardView({
       repository,
       selectedNoticeKey: url.searchParams.get('notice'),
+      noticeTypeFilter: parseNoticeTypeFilter(url.searchParams.get('type')),
     });
     sendHtml(response, renderDashboardHtml(view));
   });

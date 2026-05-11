@@ -4,6 +4,9 @@ import { renderDashboardHtml } from '../src/app/dashboard-render.js';
 import type { DashboardView } from '../src/app/dashboard-view.js';
 
 const view: DashboardView = {
+  filters: {
+    noticeType: 'all',
+  },
   stats: {
     actionableCount: 1,
     excludedCount: 1,
@@ -208,6 +211,10 @@ describe('renderDashboardHtml', () => {
 
     expect(html).toContain('관리 대시보드');
     expect(html).toContain('지원 가능 공고');
+    expect(html).toContain('aria-label="공고 유형 필터"');
+    expect(html).toContain('href="/?type=sale"');
+    expect(html).toContain('<span class="type-badge">임대</span>');
+    expect(html).toContain('<span class="type-badge">청년</span>');
     expect(html).toContain('바로 볼 공고');
     expect(html).toContain('제외된 글');
     expect(html).toContain('수집 상태');
@@ -248,6 +255,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('<strong>확인필요</strong>');
     expect(html).toContain('<span>매물정보</span>');
     expect(html).toContain('<strong>1건</strong>');
+    expect(html).toContain('<span>유형</span>');
     expect(html).toContain('신청 준비');
     expect(html).toContain('자동 신청 전에 직접 확인해야 할 항목입니다.');
     expect(html).toContain('<div class="dday">D-9</div>');
@@ -262,6 +270,36 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('16형 대학생');
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert(1)</script>');
+  });
+
+  it('renders active sale filters and preserves filter links on notice rows', () => {
+    const saleNotice = {
+      ...view.actionableNotices[0]!,
+      title: '남양주왕숙2 A-3BL 공공분양주택 입주자모집공고',
+      targetTags: ['분양', '신혼부부'],
+    };
+    const html = renderDashboardHtml({
+      ...view,
+      filters: {
+        noticeType: 'sale',
+      },
+      actionableNotices: [saleNotice],
+      noticeGroups: {
+        high: [saleNotice],
+        review: [],
+        low: [],
+      },
+      selectedNotice: {
+        ...view.selectedNotice!,
+        notice: saleNotice,
+      },
+    });
+
+    expect(html).toContain('<a class="active" href="/?type=sale">');
+    expect(html).toContain('분양 1건');
+    expect(html).toContain('href="/?notice=lh%3Anotice-1&amp;type=sale"');
+    expect(html).toContain('<span class="type-badge">분양</span>');
+    expect(html).toContain('<span class="type-badge">신혼부부</span>');
   });
 
   it('opens the profile filter by default when no profile is saved', () => {

@@ -12,6 +12,8 @@ export type DashboardNoticePriority = 'high' | 'review' | 'low';
 
 export type DashboardNoticeGroups = Record<DashboardNoticePriority, DashboardNoticeSummary[]>;
 
+export type DashboardNoticeTypeFilter = 'all' | 'sale' | 'rent' | 'newlywed' | 'youth';
+
 export type ExcludedDashboardNotice = DashboardNoticeSummary & {
   exclusionReason: NoticeExclusionReason;
 };
@@ -42,6 +44,9 @@ export type NotificationOperationStatus = {
 };
 
 export type DashboardView = {
+  filters: {
+    noticeType: DashboardNoticeTypeFilter;
+  };
   stats: {
     actionableCount: number;
     excludedCount: number;
@@ -65,6 +70,7 @@ type BuildDashboardViewInput = {
     'queryNotices' | 'queryListingsByNotice' | 'listSourceRuns' | 'getPersonalProfile' | 'listNotificationHistory'
   >;
   selectedNoticeKey?: string | null;
+  noticeTypeFilter?: DashboardNoticeTypeFilter | null;
 };
 
 const toNoticeKey = (notice: Pick<Notice, 'source' | 'sourceId'>): string =>
@@ -138,6 +144,31 @@ const groupNoticesByPriority = (notices: DashboardNoticeSummary[]): DashboardNot
   }
 
   return groups;
+};
+
+const noticeSearchText = (notice: Pick<Notice, 'title' | 'targetTags'>): string =>
+  [notice.title, ...notice.targetTags].join(' ');
+
+const isSaleNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
+  /분양|공공분양|분양주택|사전청약/.test(noticeSearchText(notice));
+
+const isRentNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
+  !isSaleNotice(notice) && /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대/.test(noticeSearchText(notice));
+
+const filterNoticeByType = (notice: DashboardNoticeSummary, filter: DashboardNoticeTypeFilter): boolean => {
+  if (filter === 'sale') {
+    return isSaleNotice(notice);
+  }
+  if (filter === 'rent') {
+    return isRentNotice(notice);
+  }
+  if (filter === 'newlywed') {
+    return noticeSearchText(notice).includes('신혼');
+  }
+  if (filter === 'youth') {
+    return /청년|대학생/.test(noticeSearchText(notice));
+  }
+  return true;
 };
 
 const hasParsedConditions = (notice: Notice): boolean => {
@@ -223,6 +254,7 @@ const buildNotificationStatus = (
 export const buildDashboardView = ({
   repository,
   selectedNoticeKey,
+  noticeTypeFilter = 'all',
 }: BuildDashboardViewInput): DashboardView => {
   const notices = repository.queryNotices({});
   const sourceRuns = repository.listSourceRuns();
@@ -244,11 +276,13 @@ export const buildDashboardView = ({
     }
   }
 
+  const filter = noticeTypeFilter ?? 'all';
   const sortedActionableNotices = safestFirst(actionableNotices);
-  const noticeGroups = groupNoticesByPriority(sortedActionableNotices);
+  const filteredActionableNotices = sortedActionableNotices.filter((notice) => filterNoticeByType(notice, filter));
+  const noticeGroups = groupNoticesByPriority(filteredActionableNotices);
   const selectedNotice =
-    sortedActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
-    sortedActionableNotices[0] ??
+    filteredActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
+    filteredActionableNotices[0] ??
     null;
   const sourceStatuses = buildSourceStatuses({
     notices,
@@ -260,6 +294,9 @@ export const buildDashboardView = ({
   const latestSourceRun = latestFirst(sourceRuns)[0] ?? null;
 
   return {
+    filters: {
+      noticeType: filter,
+    },
     stats: {
       actionableCount: actionableNotices.length,
       excludedCount: excludedNotices.length,
@@ -268,7 +305,7 @@ export const buildDashboardView = ({
       lastCollectedAt: latestSourceRun?.finishedAt ?? null,
     },
     profile,
-    actionableNotices: sortedActionableNotices,
+    actionableNotices: filteredActionableNotices,
     noticeGroups,
     excludedNotices,
     selectedNotice: selectedNotice

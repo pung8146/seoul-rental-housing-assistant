@@ -78,6 +78,45 @@ const getKoreaToday = () => {
     return `${year}-${month}-${day}`;
 };
 const cleanRelativeAge = (title) => title.replace(/\s*\d+일전/g, '').replace(/\s+/g, ' ').trim();
+const NOTICE_TYPE_FILTERS = [
+    { value: 'all', label: '전체' },
+    { value: 'sale', label: '분양' },
+    { value: 'rent', label: '임대' },
+    { value: 'newlywed', label: '신혼부부' },
+    { value: 'youth', label: '청년' },
+];
+const NOTICE_TYPE_LABELS = {
+    all: '전체',
+    sale: '분양',
+    rent: '임대',
+    newlywed: '신혼부부',
+    youth: '청년',
+};
+const noticeTypeHref = (filter) => filter === 'all' ? '/' : `/?type=${encodeURIComponent(filter)}`;
+const noticeHref = (noticeKey, filter) => {
+    const params = new URLSearchParams({ notice: noticeKey });
+    if (filter !== 'all') {
+        params.set('type', filter);
+    }
+    return `/?${params.toString()}`;
+};
+const inferNoticeTypeLabels = (notice) => {
+    const text = [notice.title, ...notice.targetTags].join(' ');
+    const labels = [];
+    if (/분양|공공분양|분양주택|사전청약/.test(text)) {
+        labels.push('분양');
+    }
+    else if (/임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대/.test(text)) {
+        labels.push('임대');
+    }
+    if (/신혼/.test(text)) {
+        labels.push('신혼부부');
+    }
+    if (/청년|대학생/.test(text)) {
+        labels.push('청년');
+    }
+    return labels.length > 0 ? labels : ['유형확인'];
+};
 const getApplicationStatus = (notice) => {
     if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
         return { className: 'closed', label: '마감' };
@@ -108,6 +147,18 @@ const renderEligibilityBadge = (notice) => `<span class="eligibility-badge ${not
 const renderEligibilityReasons = (notice) => notice.eligibility.reasons.length > 0
     ? `<div class="eligibility-reasons">${notice.eligibility.reasons.map(escapeHtml).join(' · ')}</div>`
     : '';
+const renderTypeBadges = (notice) => inferNoticeTypeLabels(notice)
+    .map((label) => `<span class="type-badge">${escapeHtml(label)}</span>`)
+    .join('');
+const renderNoticeTypeFilters = (view) => `
+  <nav class="type-filters" aria-label="공고 유형 필터">
+    ${NOTICE_TYPE_FILTERS.map((filter) => `
+        <a class="${view.filters.noticeType === filter.value ? 'active' : ''}" href="${noticeTypeHref(filter.value)}">
+          ${escapeHtml(filter.label)}
+        </a>
+      `).join('')}
+  </nav>
+`;
 const renderProfileForm = (view) => {
     const profile = view.profile;
     const interestTags = profile?.interestTags.join(', ') ?? '';
@@ -318,11 +369,11 @@ const renderApplicationPreparation = (notice, listings, attachments) => {
     </section>
   `;
 };
-const renderNoticeRow = (notice, selectedKey) => `
-  <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="/?notice=${encodeURIComponent(notice.noticeKey)}">
+const renderNoticeRow = (notice, selectedKey, filter) => `
+  <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="${escapeHtml(noticeHref(notice.noticeKey, filter))}">
     <span class="notice-title">${escapeHtml(cleanRelativeAge(notice.title))}</span>
     <span class="notice-meta">${escapeHtml(notice.source.toUpperCase())} · ${escapeHtml(notice.region)} · ${escapeHtml(notice.status)} · 등록일 ${escapeHtml(formatDate(notice.postedAt))}</span>
-    <span class="badge-row">${renderStatusBadge(notice)} ${renderEligibilityBadge(notice)}</span>
+    <span class="badge-row">${renderTypeBadges(notice)} ${renderStatusBadge(notice)} ${renderEligibilityBadge(notice)}</span>
     ${renderEligibilityReasons(notice)}
   </a>
 `;
@@ -331,7 +382,7 @@ const NOTICE_GROUP_LABELS = {
     review: '확인 필요한 공고',
     low: '낮은 우선순위',
 };
-const renderNoticeGroup = (key, notices, selectedKey) => {
+const renderNoticeGroup = (key, notices, selectedKey, filter = 'all') => {
     if (notices.length === 0) {
         return '';
     }
@@ -342,7 +393,7 @@ const renderNoticeGroup = (key, notices, selectedKey) => {
         <span>${notices.length}건</span>
       </div>
       <div class="notice-list">
-        ${notices.map((notice) => renderNoticeRow(notice, selectedKey)).join('')}
+        ${notices.map((notice) => renderNoticeRow(notice, selectedKey, filter)).join('')}
       </div>
     </div>
   `;
@@ -552,6 +603,43 @@ export const renderDashboardHtml = (view) => {
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
+    }
+    .type-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+    .type-filters a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      background: #ffffff;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .type-filters a.active {
+      color: #1e40af;
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+    .type-badge {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: #0f766e;
+      background: #ccfbf1;
+      border: 1px solid #5eead4;
+      font-size: 12px;
+      font-weight: 800;
     }
     .eligibility-badge {
       display: inline-flex;
@@ -992,12 +1080,13 @@ export const renderDashboardHtml = (view) => {
       <section>
         <div class="section-header">
           <h2>지원 가능 공고</h2>
-          <span class="muted">${view.stats.actionableCount}건</span>
+          <span class="muted">${escapeHtml(NOTICE_TYPE_LABELS[view.filters.noticeType])} ${view.actionableNotices.length}건</span>
         </div>
+        ${renderNoticeTypeFilters(view)}
         <div class="notice-groups">
           ${['high', 'review', 'low']
-        .map((key) => renderNoticeGroup(key, view.noticeGroups[key], selectedKey))
-        .join('') || '<div class="detail muted">표시할 공고가 없습니다.</div>'}
+        .map((key) => renderNoticeGroup(key, view.noticeGroups[key], selectedKey, view.filters.noticeType))
+        .join('') || `<div class="detail muted">${escapeHtml(NOTICE_TYPE_LABELS[view.filters.noticeType])} 조건에 맞는 공고가 없습니다.</div>`}
         </div>
       </section>
       <section>
@@ -1044,6 +1133,7 @@ export const renderDashboardHtml = (view) => {
                   <div class="field"><span>기관</span>${escapeHtml(selectedNotice.source.toUpperCase())}</div>
                   <div class="field"><span>지역</span>${escapeHtml(selectedNotice.region)}</div>
                   <div class="field"><span>상태</span>${renderStatusBadge(selectedNotice)} ${escapeHtml(selectedNotice.status)}</div>
+                  <div class="field"><span>유형</span><span class="badge-row">${renderTypeBadges(selectedNotice)}</span></div>
                   <div class="field"><span>등록일</span>${escapeHtml(formatDate(selectedNotice.postedAt))}</div>
                   <div class="field"><span>마감</span>${escapeHtml(formatDate(selectedNotice.applicationEndAt))}</div>
                   <div class="field"><span>지원가능성</span>${renderEligibilityBadge(selectedNotice)}${renderEligibilityReasons(selectedNotice)}</div>

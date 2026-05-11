@@ -56,6 +56,24 @@ const groupNoticesByPriority = (notices) => {
     }
     return groups;
 };
+const noticeSearchText = (notice) => [notice.title, ...notice.targetTags].join(' ');
+const isSaleNotice = (notice) => /분양|공공분양|분양주택|사전청약/.test(noticeSearchText(notice));
+const isRentNotice = (notice) => !isSaleNotice(notice) && /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대/.test(noticeSearchText(notice));
+const filterNoticeByType = (notice, filter) => {
+    if (filter === 'sale') {
+        return isSaleNotice(notice);
+    }
+    if (filter === 'rent') {
+        return isRentNotice(notice);
+    }
+    if (filter === 'newlywed') {
+        return noticeSearchText(notice).includes('신혼');
+    }
+    if (filter === 'youth') {
+        return /청년|대학생/.test(noticeSearchText(notice));
+    }
+    return true;
+};
 const hasParsedConditions = (notice) => {
     const requirements = notice.metadata.eligibilityRequirements;
     return Boolean(requirements && typeof requirements === 'object' && !Array.isArray(requirements));
@@ -112,7 +130,7 @@ const buildNotificationStatus = (notificationHistory) => ({
     channelCount: new Set(notificationHistory.map((history) => history.channel)).size,
     lastSentAt: notificationHistory[0]?.sentAt ?? null,
 });
-export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
+export const buildDashboardView = ({ repository, selectedNoticeKey, noticeTypeFilter = 'all', }) => {
     const notices = repository.queryNotices({});
     const sourceRuns = repository.listSourceRuns();
     const notificationHistory = repository.listNotificationHistory();
@@ -132,10 +150,12 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
             actionableNotices.push(keyedNotice);
         }
     }
+    const filter = noticeTypeFilter ?? 'all';
     const sortedActionableNotices = safestFirst(actionableNotices);
-    const noticeGroups = groupNoticesByPriority(sortedActionableNotices);
-    const selectedNotice = sortedActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
-        sortedActionableNotices[0] ??
+    const filteredActionableNotices = sortedActionableNotices.filter((notice) => filterNoticeByType(notice, filter));
+    const noticeGroups = groupNoticesByPriority(filteredActionableNotices);
+    const selectedNotice = filteredActionableNotices.find((notice) => notice.noticeKey === selectedNoticeKey) ??
+        filteredActionableNotices[0] ??
         null;
     const sourceStatuses = buildSourceStatuses({
         notices,
@@ -146,6 +166,9 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
     });
     const latestSourceRun = latestFirst(sourceRuns)[0] ?? null;
     return {
+        filters: {
+            noticeType: filter,
+        },
         stats: {
             actionableCount: actionableNotices.length,
             excludedCount: excludedNotices.length,
@@ -154,7 +177,7 @@ export const buildDashboardView = ({ repository, selectedNoticeKey, }) => {
             lastCollectedAt: latestSourceRun?.finishedAt ?? null,
         },
         profile,
-        actionableNotices: sortedActionableNotices,
+        actionableNotices: filteredActionableNotices,
         noticeGroups,
         excludedNotices,
         selectedNotice: selectedNotice

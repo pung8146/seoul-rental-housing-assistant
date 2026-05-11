@@ -139,4 +139,33 @@ describe('buildDashboardView', () => {
             status: 'success',
         });
     });
+    it('filters actionable notices by dashboard notice type', () => {
+        const repository = createRepository(':memory:');
+        const rentNotice = makeNotice(1, {
+            title: '서울 청년 매입임대주택 입주자 모집공고',
+            targetTags: ['청년', '매입임대'],
+        });
+        const saleNotice = makeNotice(2, {
+            title: '남양주왕숙2 A-3BL 공공분양주택 입주자모집공고',
+            targetTags: ['분양', '신혼부부'],
+        });
+        repository.upsertNotice(rentNotice);
+        repository.upsertNotice(saleNotice);
+        const saleView = buildDashboardView({
+            repository,
+            noticeTypeFilter: 'sale',
+        });
+        const newlywedView = buildDashboardView({
+            repository,
+            noticeTypeFilter: 'newlywed',
+        });
+        const youthView = buildDashboardView({
+            repository,
+            noticeTypeFilter: 'youth',
+        });
+        expect(saleView.filters.noticeType).toBe('sale');
+        expect(saleView.actionableNotices.map((notice) => notice.title)).toEqual([saleNotice.title]);
+        expect(newlywedView.actionableNotices.map((notice) => notice.title)).toEqual([saleNotice.title]);
+        expect(youthView.actionableNotices.map((notice) => notice.title)).toEqual([rentNotice.title]);
+    });
 });

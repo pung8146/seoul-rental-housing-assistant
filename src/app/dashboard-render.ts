@@ -1,4 +1,4 @@
-import type { DashboardView, ExcludedDashboardNotice } from './dashboard-view.js';
+import type { DashboardNoticeTypeFilter, DashboardView, ExcludedDashboardNotice } from './dashboard-view.js';
 import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
 import type { Listing, Notice, SourceRun } from '../types.js';
 
@@ -105,6 +105,50 @@ const getKoreaToday = (): string => {
 
 const cleanRelativeAge = (title: string): string => title.replace(/\s*\d+일전/g, '').replace(/\s+/g, ' ').trim();
 
+const NOTICE_TYPE_FILTERS: Array<{ value: DashboardNoticeTypeFilter; label: string }> = [
+  { value: 'all', label: '전체' },
+  { value: 'sale', label: '분양' },
+  { value: 'rent', label: '임대' },
+  { value: 'newlywed', label: '신혼부부' },
+  { value: 'youth', label: '청년' },
+];
+
+const NOTICE_TYPE_LABELS: Record<DashboardNoticeTypeFilter, string> = {
+  all: '전체',
+  sale: '분양',
+  rent: '임대',
+  newlywed: '신혼부부',
+  youth: '청년',
+};
+
+const noticeTypeHref = (filter: DashboardNoticeTypeFilter): string =>
+  filter === 'all' ? '/' : `/?type=${encodeURIComponent(filter)}`;
+
+const noticeHref = (noticeKey: string, filter: DashboardNoticeTypeFilter): string => {
+  const params = new URLSearchParams({ notice: noticeKey });
+  if (filter !== 'all') {
+    params.set('type', filter);
+  }
+  return `/?${params.toString()}`;
+};
+
+const inferNoticeTypeLabels = (notice: Pick<Notice, 'title' | 'targetTags'>): string[] => {
+  const text = [notice.title, ...notice.targetTags].join(' ');
+  const labels: string[] = [];
+  if (/분양|공공분양|분양주택|사전청약/.test(text)) {
+    labels.push('분양');
+  } else if (/임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대/.test(text)) {
+    labels.push('임대');
+  }
+  if (/신혼/.test(text)) {
+    labels.push('신혼부부');
+  }
+  if (/청년|대학생/.test(text)) {
+    labels.push('청년');
+  }
+  return labels.length > 0 ? labels : ['유형확인'];
+};
+
 type ApplicationStatus = {
   className: 'available' | 'upcoming' | 'posted' | 'closed' | 'unknown';
   label: '신청가능' | '접수예정' | '공고중' | '마감' | '확인필요';
@@ -155,6 +199,23 @@ const renderEligibilityReasons = (notice: Pick<DashboardView['actionableNotices'
   notice.eligibility.reasons.length > 0
     ? `<div class="eligibility-reasons">${notice.eligibility.reasons.map(escapeHtml).join(' · ')}</div>`
     : '';
+
+const renderTypeBadges = (notice: Pick<Notice, 'title' | 'targetTags'>): string =>
+  inferNoticeTypeLabels(notice)
+    .map((label) => `<span class="type-badge">${escapeHtml(label)}</span>`)
+    .join('');
+
+const renderNoticeTypeFilters = (view: DashboardView): string => `
+  <nav class="type-filters" aria-label="공고 유형 필터">
+    ${NOTICE_TYPE_FILTERS.map(
+      (filter) => `
+        <a class="${view.filters.noticeType === filter.value ? 'active' : ''}" href="${noticeTypeHref(filter.value)}">
+          ${escapeHtml(filter.label)}
+        </a>
+      `,
+    ).join('')}
+  </nav>
+`;
 
 const renderProfileForm = (view: DashboardView): string => {
   const profile = view.profile;
@@ -420,15 +481,17 @@ const renderApplicationPreparation = (
   `;
 };
 
-const renderNoticeRow = (notice: DashboardView['actionableNotices'][number], selectedKey?: string): string => `
-  <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="/?notice=${encodeURIComponent(
-    notice.noticeKey,
-  )}">
+const renderNoticeRow = (
+  notice: DashboardView['actionableNotices'][number],
+  selectedKey: string | undefined,
+  filter: DashboardNoticeTypeFilter,
+): string => `
+  <a class="notice-row ${notice.noticeKey === selectedKey ? 'selected' : ''}" href="${escapeHtml(noticeHref(notice.noticeKey, filter))}">
     <span class="notice-title">${escapeHtml(cleanRelativeAge(notice.title))}</span>
     <span class="notice-meta">${escapeHtml(notice.source.toUpperCase())} · ${escapeHtml(notice.region)} · ${escapeHtml(
       notice.status,
     )} · 등록일 ${escapeHtml(formatDate(notice.postedAt))}</span>
-    <span class="badge-row">${renderStatusBadge(notice)} ${renderEligibilityBadge(notice)}</span>
+    <span class="badge-row">${renderTypeBadges(notice)} ${renderStatusBadge(notice)} ${renderEligibilityBadge(notice)}</span>
     ${renderEligibilityReasons(notice)}
   </a>
 `;
@@ -443,6 +506,7 @@ const renderNoticeGroup = (
   key: keyof DashboardView['noticeGroups'],
   notices: DashboardView['noticeGroups'][keyof DashboardView['noticeGroups']],
   selectedKey?: string,
+  filter: DashboardNoticeTypeFilter = 'all',
 ): string => {
   if (notices.length === 0) {
     return '';
@@ -455,7 +519,7 @@ const renderNoticeGroup = (
         <span>${notices.length}건</span>
       </div>
       <div class="notice-list">
-        ${notices.map((notice) => renderNoticeRow(notice, selectedKey)).join('')}
+        ${notices.map((notice) => renderNoticeRow(notice, selectedKey, filter)).join('')}
       </div>
     </div>
   `;
@@ -678,6 +742,43 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
+    }
+    .type-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+    .type-filters a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      background: #ffffff;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .type-filters a.active {
+      color: #1e40af;
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+    .type-badge {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: #0f766e;
+      background: #ccfbf1;
+      border: 1px solid #5eead4;
+      font-size: 12px;
+      font-weight: 800;
     }
     .eligibility-badge {
       display: inline-flex;
@@ -1118,13 +1219,14 @@ export const renderDashboardHtml = (view: DashboardView): string => {
       <section>
         <div class="section-header">
           <h2>지원 가능 공고</h2>
-          <span class="muted">${view.stats.actionableCount}건</span>
+          <span class="muted">${escapeHtml(NOTICE_TYPE_LABELS[view.filters.noticeType])} ${view.actionableNotices.length}건</span>
         </div>
+        ${renderNoticeTypeFilters(view)}
         <div class="notice-groups">
           ${
             (['high', 'review', 'low'] as const)
-              .map((key) => renderNoticeGroup(key, view.noticeGroups[key], selectedKey))
-              .join('') || '<div class="detail muted">표시할 공고가 없습니다.</div>'
+              .map((key) => renderNoticeGroup(key, view.noticeGroups[key], selectedKey, view.filters.noticeType))
+              .join('') || `<div class="detail muted">${escapeHtml(NOTICE_TYPE_LABELS[view.filters.noticeType])} 조건에 맞는 공고가 없습니다.</div>`
           }
         </div>
       </section>
@@ -1175,6 +1277,7 @@ export const renderDashboardHtml = (view: DashboardView): string => {
                   <div class="field"><span>기관</span>${escapeHtml(selectedNotice.source.toUpperCase())}</div>
                   <div class="field"><span>지역</span>${escapeHtml(selectedNotice.region)}</div>
                   <div class="field"><span>상태</span>${renderStatusBadge(selectedNotice)} ${escapeHtml(selectedNotice.status)}</div>
+                  <div class="field"><span>유형</span><span class="badge-row">${renderTypeBadges(selectedNotice)}</span></div>
                   <div class="field"><span>등록일</span>${escapeHtml(formatDate(selectedNotice.postedAt))}</div>
                   <div class="field"><span>마감</span>${escapeHtml(formatDate(selectedNotice.applicationEndAt))}</div>
                   <div class="field"><span>지원가능성</span>${renderEligibilityBadge(selectedNotice)}${renderEligibilityReasons(selectedNotice)}</div>
