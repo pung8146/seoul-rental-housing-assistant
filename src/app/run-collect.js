@@ -1,5 +1,6 @@
 import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
+import { createGhAdapter } from '../adapters/gh.js';
 import { createRepository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { findPrimaryApplicationAttachment } from '../domain/attachments.js';
@@ -16,7 +17,7 @@ const toMessage = (error) => {
 const DETAIL_FETCH_CONCURRENCY = 5;
 const DEFAULT_COLLECT_REGIONS = ['서울', '경기'];
 const EMPTY_COLLECT_MESSAGE = '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.';
-export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter()];
+export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter(), createGhAdapter()];
 export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 const filterNoticesByRegion = (rawNotices, regions) => rawNotices.filter((notice) => {
     const region = normalizeRegion(notice.region);

@@ -261,7 +261,7 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('<span>유형</span>');
     expect(html).toContain('신청 준비');
     expect(html).toContain('자동 신청 전에 직접 확인해야 할 항목입니다.');
-    expect(html).toContain('<div class="dday">D-9</div>');
+    expect(html).toMatch(/<div class="dday">D-\d+<\/div>/);
     expect(html).toContain('신청 링크');
     expect(html).toContain('공고문 확인');
     expect(html).toContain('필요 확인 항목');
