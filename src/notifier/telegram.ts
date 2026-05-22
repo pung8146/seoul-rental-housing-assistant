@@ -99,21 +99,24 @@ export const loadTelegramNotifyConfig = ({
   const envToken = env.TELEGRAM_BOT_TOKEN ?? env.OPENCLAW_TELEGRAM_BOT_TOKEN;
   const envChatIds = parseCsv(env.TELEGRAM_CHAT_ID ?? env.TELEGRAM_CHAT_IDS);
   const messageThreadId = parseMessageThreadId(env.TELEGRAM_MESSAGE_THREAD_ID ?? env.TELEGRAM_TOPIC_ID);
+  const configPath = openClawConfigPath ?? env.OPENCLAW_CONFIG_PATH ?? '/home/pung8146/.openclaw/openclaw.json';
+  let openClawConfig: TelegramNotifyConfig | null = null;
 
-  if (envToken && envChatIds.length > 0) {
+  try {
+    openClawConfig = getOpenClawTelegramConfig(readOpenClawConfig(configPath));
+  } catch {
+    openClawConfig = null;
+  }
+
+  if ((envToken || openClawConfig?.botToken) && envChatIds.length > 0) {
     return {
-      botToken: envToken,
+      botToken: envToken ?? openClawConfig!.botToken,
       chatIds: envChatIds,
       ...(messageThreadId ? { messageThreadId } : {}),
     };
   }
 
-  const configPath = openClawConfigPath ?? env.OPENCLAW_CONFIG_PATH ?? '/home/pung8146/.openclaw/openclaw.json';
-  try {
-    return getOpenClawTelegramConfig(readOpenClawConfig(configPath));
-  } catch {
-    return null;
-  }
+  return openClawConfig;
 };
 
 export const sendTelegramMessage = async ({

@@ -52,6 +52,41 @@ describe('loadTelegramNotifyConfig', () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+
+  it('uses explicit environment targets with an OpenClaw token fallback', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'openclaw-config-'));
+    const configPath = join(directory, 'openclaw.json');
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          channels: {
+            telegram: {
+              botToken: 'token-from-openclaw',
+              allowFrom: ['telegram:123'],
+            },
+          },
+        }),
+      );
+
+      expect(
+        loadTelegramNotifyConfig({
+          env: {
+            TELEGRAM_CHAT_ID: 'telegram:-1003616596170',
+            TELEGRAM_MESSAGE_THREAD_ID: '4024',
+          },
+          openClawConfigPath: configPath,
+        }),
+      ).toEqual({
+        botToken: 'token-from-openclaw',
+        chatIds: ['-1003616596170'],
+        messageThreadId: 4024,
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('sendTelegramMessage', () => {

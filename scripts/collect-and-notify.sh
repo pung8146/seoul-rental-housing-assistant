@@ -25,9 +25,15 @@ export PATH="$NODE_BIN:/usr/local/bin:/usr/bin:/bin"
 export RENTAL_HOUSING_DB_PATH="${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}"
 export RENTAL_HOUSING_CONTEXT_PATH="${RENTAL_HOUSING_CONTEXT_PATH:-$STATE_DIR/telegram-context.json}"
 
+if [ -f "$STATE_DIR/collect-notify.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$STATE_DIR/collect-notify.env"
+  set +a
+fi
+
 {
   printf '\n[%s] collect notify start\n' "$(date -Is)"
   npm run collect:notify -- "$@"
   printf '[%s] collect notify done\n' "$(date -Is)"
 } >> "$LOG_FILE" 2>&1
-
