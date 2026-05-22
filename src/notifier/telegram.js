@@ -14,6 +14,14 @@ const parseCsv = (value) => unique((value ?? '')
     .split(',')
     .map(normalizeChatId)
     .filter((item) => Boolean(item)));
+const parseMessageThreadId = (value) => {
+    const rawValue = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : '';
+    if (!rawValue) {
+        return undefined;
+    }
+    const parsed = Number.parseInt(rawValue, 10);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+};
 const readOpenClawConfig = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const getOpenClawTelegramConfig = (config) => {
     if (!config || typeof config !== 'object') {
@@ -27,6 +35,8 @@ const getOpenClawTelegramConfig = (config) => {
         return null;
     }
     const botToken = telegram.botToken;
+    const messageThreadId = parseMessageThreadId(telegram.messageThreadId ??
+        telegram.topicId);
     const allowFrom = telegram.allowFrom;
     const groupAllowFrom = telegram.groupAllowFrom;
     const chatIds = [
@@ -41,15 +51,18 @@ const getOpenClawTelegramConfig = (config) => {
     return {
         botToken: botToken.trim(),
         chatIds: unique(chatIds),
+        ...(messageThreadId ? { messageThreadId } : {}),
     };
 };
 export const loadTelegramNotifyConfig = ({ env = process.env, openClawConfigPath, } = {}) => {
     const envToken = env.TELEGRAM_BOT_TOKEN ?? env.OPENCLAW_TELEGRAM_BOT_TOKEN;
     const envChatIds = parseCsv(env.TELEGRAM_CHAT_ID ?? env.TELEGRAM_CHAT_IDS);
+    const messageThreadId = parseMessageThreadId(env.TELEGRAM_MESSAGE_THREAD_ID ?? env.TELEGRAM_TOPIC_ID);
     if (envToken && envChatIds.length > 0) {
         return {
             botToken: envToken,
             chatIds: envChatIds,
+            ...(messageThreadId ? { messageThreadId } : {}),
         };
     }
     const configPath = openClawConfigPath ?? env.OPENCLAW_CONFIG_PATH ?? '/home/pung8146/.openclaw/openclaw.json';
@@ -60,11 +73,12 @@ export const loadTelegramNotifyConfig = ({ env = process.env, openClawConfigPath
         return null;
     }
 };
-export const sendTelegramMessage = async ({ botToken, chatId, text, fetchImpl = fetch, }) => {
+export const sendTelegramMessage = async ({ botToken, chatId, messageThreadId, text, fetchImpl = fetch, }) => {
     const response = await fetchImpl(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         body: JSON.stringify({
             chat_id: chatId,
             disable_web_page_preview: true,
+            ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
             text,
         }),
         headers: {

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 export type TelegramNotifyConfig = {
   botToken: string;
   chatIds: string[];
+  messageThreadId?: number;
 };
 
 type FetchLike = typeof fetch;
@@ -10,6 +11,7 @@ type FetchLike = typeof fetch;
 type SendTelegramMessageInput = {
   botToken: string;
   chatId: string;
+  messageThreadId?: number;
   text: string;
   fetchImpl?: FetchLike;
 };
@@ -37,6 +39,16 @@ const parseCsv = (value: string | undefined): string[] =>
       .filter((item): item is string => Boolean(item)),
   );
 
+const parseMessageThreadId = (value: unknown): number | undefined => {
+  const rawValue = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : '';
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+};
+
 const readOpenClawConfig = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 
 const getOpenClawTelegramConfig = (config: unknown): TelegramNotifyConfig | null => {
@@ -53,6 +65,10 @@ const getOpenClawTelegramConfig = (config: unknown): TelegramNotifyConfig | null
   }
 
   const botToken = (telegram as { botToken?: unknown }).botToken;
+  const messageThreadId = parseMessageThreadId(
+    (telegram as { messageThreadId?: unknown; topicId?: unknown }).messageThreadId ??
+      (telegram as { messageThreadId?: unknown; topicId?: unknown }).topicId,
+  );
   const allowFrom = (telegram as { allowFrom?: unknown }).allowFrom;
   const groupAllowFrom = (telegram as { groupAllowFrom?: unknown }).groupAllowFrom;
   const chatIds = [
@@ -69,6 +85,7 @@ const getOpenClawTelegramConfig = (config: unknown): TelegramNotifyConfig | null
   return {
     botToken: botToken.trim(),
     chatIds: unique(chatIds),
+    ...(messageThreadId ? { messageThreadId } : {}),
   };
 };
 
@@ -81,11 +98,13 @@ export const loadTelegramNotifyConfig = ({
 } = {}): TelegramNotifyConfig | null => {
   const envToken = env.TELEGRAM_BOT_TOKEN ?? env.OPENCLAW_TELEGRAM_BOT_TOKEN;
   const envChatIds = parseCsv(env.TELEGRAM_CHAT_ID ?? env.TELEGRAM_CHAT_IDS);
+  const messageThreadId = parseMessageThreadId(env.TELEGRAM_MESSAGE_THREAD_ID ?? env.TELEGRAM_TOPIC_ID);
 
   if (envToken && envChatIds.length > 0) {
     return {
       botToken: envToken,
       chatIds: envChatIds,
+      ...(messageThreadId ? { messageThreadId } : {}),
     };
   }
 
@@ -100,6 +119,7 @@ export const loadTelegramNotifyConfig = ({
 export const sendTelegramMessage = async ({
   botToken,
   chatId,
+  messageThreadId,
   text,
   fetchImpl = fetch,
 }: SendTelegramMessageInput): Promise<void> => {
@@ -107,6 +127,7 @@ export const sendTelegramMessage = async ({
     body: JSON.stringify({
       chat_id: chatId,
       disable_web_page_preview: true,
+      ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
       text,
     }),
     headers: {
@@ -119,4 +140,3 @@ export const sendTelegramMessage = async ({
     throw new Error(`텔레그램 발송 실패: HTTP ${response.status}`);
   }
 };
-

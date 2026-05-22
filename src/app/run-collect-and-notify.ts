@@ -52,9 +52,11 @@ const main = async () => {
     }
 
     const payloadHash = buildNotificationPayloadHash(message);
+    const targetKey = (chatId: string): string =>
+      config.messageThreadId ? `telegram:${chatId}:${config.messageThreadId}` : `telegram:${chatId}`;
     const targetChatIds = forceNotify
       ? config.chatIds
-      : config.chatIds.filter((chatId) => !repository.hasNotification(`telegram:${chatId}`, payloadHash));
+      : config.chatIds.filter((chatId) => !repository.hasNotification(targetKey(chatId), payloadHash));
 
     if (targetChatIds.length === 0) {
       console.log('텔레그램 알림 생략: 이미 발송한 내용입니다.');
@@ -65,9 +67,10 @@ const main = async () => {
       await sendTelegramMessage({
         botToken: config.botToken,
         chatId,
+        messageThreadId: config.messageThreadId,
         text: message,
       });
-      repository.recordNotification(`telegram:${chatId}`, payloadHash, new Date().toISOString());
+      repository.recordNotification(targetKey(chatId), payloadHash, new Date().toISOString());
     }
 
     console.log(`텔레그램 알림 발송 완료: ${targetChatIds.length}개 대상`);

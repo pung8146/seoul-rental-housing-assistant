@@ -12,6 +12,7 @@ describe('loadTelegramNotifyConfig', () => {
       env: {
         TELEGRAM_BOT_TOKEN: 'token-from-env',
         TELEGRAM_CHAT_IDS: 'telegram:123,456',
+        TELEGRAM_MESSAGE_THREAD_ID: '789',
       },
       openClawConfigPath: '/missing/openclaw.json',
     });
@@ -19,6 +20,7 @@ describe('loadTelegramNotifyConfig', () => {
     expect(config).toEqual({
       botToken: 'token-from-env',
       chatIds: ['123', '456'],
+      messageThreadId: 789,
     });
   });
 
@@ -33,6 +35,7 @@ describe('loadTelegramNotifyConfig', () => {
           channels: {
             telegram: {
               botToken: 'token-from-openclaw',
+              topicId: 321,
               allowFrom: ['telegram:123'],
               groupAllowFrom: ['telegram:456', 'telegram:123'],
             },
@@ -43,6 +46,7 @@ describe('loadTelegramNotifyConfig', () => {
       expect(loadTelegramNotifyConfig({ env: {}, openClawConfigPath: configPath })).toEqual({
         botToken: 'token-from-openclaw',
         chatIds: ['123', '456'],
+        messageThreadId: 321,
       });
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -61,6 +65,7 @@ describe('sendTelegramMessage', () => {
     await sendTelegramMessage({
       botToken: 'token',
       chatId: '123',
+      messageThreadId: 789,
       text: '새 공고',
       fetchImpl,
     });
@@ -73,6 +78,7 @@ describe('sendTelegramMessage', () => {
         body: JSON.stringify({
           chat_id: '123',
           disable_web_page_preview: true,
+          message_thread_id: 789,
           text: '새 공고',
         }),
       }),
