@@ -64,6 +64,71 @@ const ghDetailHtml = `
   </main>
 `;
 
+const ghApplyListHtml = `
+  <table>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>통합공공임대</td>
+        <td>
+          <a href="#a" class="text_cut"
+            data-previewYn="N"
+            data-pbancNo="793"
+            data-pbancKndCd="01"
+            data-bizTyNm="통합공공임대"
+          >
+            (최초) 다산지금A3 통합공공임대주택 입주자 모집 공고
+          </a>
+        </td>
+        <td>남양주시</td>
+        <td><img src="/images/sub/hwp.png" alt="hwp파일"><img src="/images/sub/pdf.png" alt="pdf파일"></td>
+        <td>2026-05-28</td>
+        <td>2026-06-19</td>
+        <td>접수중</td>
+        <td><button type="button" class="btn_normal" data-pbancNo="793" data-bizTyCd="08">확인</button></td>
+        <td>153794</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>국민임대</td>
+        <td><a href="#a" data-pbancNo="790" data-bizTyNm="국민임대">다산메트로 국민임대주택 예비입주자 발표</a></td>
+        <td>남양주시</td>
+        <td></td>
+        <td>2026-05-27</td>
+        <td>2026-06-20</td>
+        <td>접수중</td>
+        <td></td>
+        <td>100</td>
+      </tr>
+    </tbody>
+  </table>
+`;
+
+const ghApplyDetailHtml = `
+  <main>
+    <table>
+      <tr><th scope="row">공고명</th><td colspan="3" class="txt_l"><b>(최초) 다산지금A3 통합공공임대주택 입주자 모집 공고</b></td></tr>
+      <tr><th scope="row">공고상태</th><td class="txt_l">접수중</td></tr>
+      <tr><th scope="row">공고일</th><td>2026-05-28</td></tr>
+      <tr>
+        <th scope="row">공고문</th>
+        <td>
+          <a href="/sr/sr7150/selectFileDown.do?pbancNo=793&amp;atchFileSn=1585316&amp;atchFileDtlSn=36&amp;mode=1">
+            [공고]다산지금A3 통합공공임대주택 입주자 모집공고_28.05.28 공고.hwp (641024 Byte)
+          </a>
+          <a href="/sr/sr7150/selectFileDown.do?pbancNo=793&amp;atchFileSn=1585316&amp;atchFileDtlSn=37&amp;mode=1">
+            [공고]다산지금A3 통합공공임대주택 입주자 모집공고_28.05.28 공고.pdf (1164034 Byte)
+          </a>
+        </td>
+      </tr>
+    </table>
+    <ul>
+      <li><span><b>온라인접수기간 : </b>2026.06.16 10:00 ~ 2026.06.19 17:00</span></li>
+      <li>신청자격: 무주택 세대구성원</li>
+    </ul>
+  </main>
+`;
+
 describe('GH adapter', () => {
   it('parses actionable GH housing notices and excludes result announcements', () => {
     const notices = parseGhNoticeListHtml(ghListHtml);
@@ -99,7 +164,7 @@ describe('GH adapter', () => {
         requestedUrls.push(String(url));
         return {
           async text() {
-            return requestedUrls.length === 1 ? ghListHtml : ghDetailHtml;
+            return requestedUrls.length === 1 ? ghListHtml : requestedUrls.length === 2 ? ghApplyListHtml : ghDetailHtml;
           },
         } as Response;
       }) as typeof fetch,
@@ -113,7 +178,8 @@ describe('GH adapter', () => {
     const metadata = detailedNotice!.metadata ?? {};
 
     expect(requestedUrls[0]).toBe('https://gh.or.kr/gh/announcement-of-salerental001.do?srCategoryId=12');
-    expect(requestedUrls[1]).toBe(notices[0]!.sourceUrl);
+    expect(requestedUrls[1]).toBe('https://apply.gh.or.kr/sb/sr/sr7150/selectPbancRentHouseList.do');
+    expect(requestedUrls[2]).toBe(notices[0]!.sourceUrl);
     expect(detailedNotice).toMatchObject({
       sourceId: '64847',
       title: '다산 센트럴파크6단지 영구임대주택 예비입주자 모집 공고',
@@ -143,6 +209,56 @@ describe('GH adapter', () => {
       requiresHomeless: true,
     });
     expect(metadata.bodyPreview).toContain('신청접수기간');
+  });
+
+  it('collects GH apply center rental notices with pbanc detail URLs', async () => {
+    const requestedUrls: string[] = [];
+    const adapter = createGhAdapter({
+      fetchApplyDetails: true,
+      fetch: (async (url: string | URL | Request) => {
+        requestedUrls.push(String(url));
+        return {
+          async text() {
+            return requestedUrls.length === 1 ? '<table></table>' : requestedUrls.length === 2 ? ghApplyListHtml : ghApplyDetailHtml;
+          },
+        } as Response;
+      }) as typeof fetch,
+    });
+
+    const notices = await adapter.fetchNotices();
+    const notice = notices.find((item) => item.sourceId === 'apply-793');
+    const detailedNotice = await adapter.fetchNoticeDetails?.('apply-793');
+    const metadata = detailedNotice?.metadata ?? {};
+
+    expect(notice).toMatchObject({
+      sourceId: 'apply-793',
+      title: '(최초) 다산지금A3 통합공공임대주택 입주자 모집 공고',
+      status: '신청가능',
+      region: '경기',
+      postedAt: '2026-05-28',
+      applicationEndAt: '2026-06-19',
+      sourceUrl: 'https://apply.gh.or.kr/sb/sr/sr7150/selectPbancDetailView.do?pbancNo=793',
+    });
+    expect(detailedNotice).toMatchObject({
+      applicationStartAt: '2026-06-16',
+      applicationEndAt: '2026-06-19',
+    });
+    expect(metadata.attachments).toEqual([
+      {
+        title: '[공고]다산지금A3 통합공공임대주택 입주자 모집공고_28.05.28 공고.pdf',
+        url: 'https://apply.gh.or.kr/sr/sr7150/selectFileDown.do?pbancNo=793&atchFileSn=1585316&atchFileDtlSn=37&mode=1',
+      },
+      {
+        title: '[공고]다산지금A3 통합공공임대주택 입주자 모집공고_28.05.28 공고.hwp',
+        url: 'https://apply.gh.or.kr/sr/sr7150/selectFileDown.do?pbancNo=793&atchFileSn=1585316&atchFileDtlSn=36&mode=1',
+      },
+    ]);
+    expect(metadata.primaryApplicationAttachment).toEqual({
+      title: '[공고]다산지금A3 통합공공임대주택 입주자 모집공고_28.05.28 공고.pdf',
+      url: 'https://apply.gh.or.kr/sr/sr7150/selectFileDown.do?pbancNo=793&atchFileSn=1585316&atchFileDtlSn=37&mode=1',
+    });
+    expect(metadata.locality).toBe('남양주시');
+    expect(metadata.rawIds).toEqual({ pbancNo: '793' });
   });
 
   it('keeps GH detail parsing safe when optional fields are absent', () => {

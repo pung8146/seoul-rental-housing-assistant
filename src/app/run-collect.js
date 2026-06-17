@@ -15,6 +15,7 @@ const toMessage = (error) => {
     return 'unknown error';
 };
 const DETAIL_FETCH_CONCURRENCY = 5;
+const DOCUMENT_FETCH_TIMEOUT_MS = 15_000;
 const DEFAULT_COLLECT_REGIONS = ['서울', '경기'];
 const EMPTY_COLLECT_MESSAGE = '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.';
 export const createDefaultAdapters = () => [createLhAdapter(), createShAdapter(), createGhAdapter()];
@@ -63,7 +64,7 @@ const hydrateNoticeDocumentTexts = async (notices, fetchImpl) => {
     for (const notice of notices) {
         const attachments = getAttachments(notice);
         const primaryAttachment = findPrimaryApplicationAttachment(attachments);
-        if (!primaryAttachment || notice.metadata?.eligibilityRequirements) {
+        if (!primaryAttachment || notice.metadata?.eligibilityRequirements || notice.metadata?.skipDocumentText) {
             hydrated.push(notice);
             continue;
         }
@@ -88,6 +89,10 @@ const hydrateNoticeDocumentTexts = async (notices, fetchImpl) => {
     }
     return hydrated;
 };
+const withTimeoutFetch = (fetchImpl, timeoutMs) => (async (input, init) => fetchImpl(input, {
+    ...init,
+    signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
+}));
 export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLECT_REGIONS, documentFetch = fetch, }) => {
     const events = [];
     const failures = [];
@@ -109,7 +114,7 @@ export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLE
             const scopedNotices = filterNoticesByRegion(rawNotices, regions);
             const detailResult = await hydrateNoticeDetails(adapter, scopedNotices);
             failures.push(...detailResult.failures);
-            const detailedNotices = await hydrateNoticeDocumentTexts(detailResult.notices, documentFetch);
+            const detailedNotices = await hydrateNoticeDocumentTexts(detailResult.notices, withTimeoutFetch(documentFetch, DOCUMENT_FETCH_TIMEOUT_MS));
             const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
             for (const notice of notices) {
                 const incomingListings = listings.filter((listing) => listing.source === notice.source && listing.noticeSourceId === notice.sourceId);

@@ -38,6 +38,7 @@ const toMessage = (error: unknown): string => {
 };
 
 const DETAIL_FETCH_CONCURRENCY = 5;
+const DOCUMENT_FETCH_TIMEOUT_MS = 15_000;
 const DEFAULT_COLLECT_REGIONS = ['서울', '경기'];
 const EMPTY_COLLECT_MESSAGE = '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.';
 
@@ -108,7 +109,7 @@ const hydrateNoticeDocumentTexts = async (
   for (const notice of notices) {
     const attachments = getAttachments(notice);
     const primaryAttachment = findPrimaryApplicationAttachment(attachments);
-    if (!primaryAttachment || notice.metadata?.eligibilityRequirements) {
+    if (!primaryAttachment || notice.metadata?.eligibilityRequirements || notice.metadata?.skipDocumentText) {
       hydrated.push(notice);
       continue;
     }
@@ -136,6 +137,13 @@ const hydrateNoticeDocumentTexts = async (
 
   return hydrated;
 };
+
+const withTimeoutFetch = (fetchImpl: typeof fetch, timeoutMs: number): typeof fetch =>
+  (async (input: RequestInfo | URL, init?: RequestInit) =>
+    fetchImpl(input, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(timeoutMs),
+    })) as typeof fetch;
 
 export const runCollect = async ({
   adapters,
@@ -166,7 +174,10 @@ export const runCollect = async ({
       const scopedNotices = filterNoticesByRegion(rawNotices, regions);
       const detailResult = await hydrateNoticeDetails(adapter, scopedNotices);
       failures.push(...detailResult.failures);
-      const detailedNotices = await hydrateNoticeDocumentTexts(detailResult.notices, documentFetch);
+      const detailedNotices = await hydrateNoticeDocumentTexts(
+        detailResult.notices,
+        withTimeoutFetch(documentFetch, DOCUMENT_FETCH_TIMEOUT_MS),
+      );
       const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
 
       for (const notice of notices) {

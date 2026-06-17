@@ -1,3 +1,5 @@
+import { request as httpsRequest } from 'node:https';
+
 import type { RawNoticeCandidate, SourceAdapter } from './base.js';
 import { isActionableNoticeTitle } from '../domain/actionable.js';
 import { findPrimaryApplicationAttachment } from '../domain/attachments.js';
@@ -6,11 +8,15 @@ import { extractEligibilityRequirementsFromText } from '../domain/requirements.j
 const GH_PROVIDER = 'GH';
 const GH_ORIGIN = 'https://gh.or.kr';
 const GH_HOUSING_NOTICE_LIST_URL = 'https://gh.or.kr/gh/announcement-of-salerental001.do?srCategoryId=12';
+const GH_APPLY_ORIGIN = 'https://apply.gh.or.kr';
+const GH_APPLY_RENT_NOTICE_LIST_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7150/selectPbancRentHouseList.do`;
+const GH_APPLY_RENT_NOTICE_DETAIL_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7150/selectPbancDetailView.do`;
 
 type GhFetch = typeof fetch;
 
 export type CreateGhAdapterOptions = {
   fetch?: GhFetch;
+  fetchApplyDetails?: boolean;
   useFixtureFallback?: boolean;
 };
 
@@ -24,6 +30,47 @@ const stripHtml = (html: string): string =>
       .trim(),
   );
 
+const isGhApplyUrl = (url: string): boolean => {
+  try {
+    return new URL(url).hostname === 'apply.gh.or.kr';
+  } catch {
+    return false;
+  }
+};
+
+const isCertificateVerificationError = (error: unknown): boolean => {
+  const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
+  return cause?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE';
+};
+
+const fetchGhApplyTextWithoutCertificateVerification = (url: string): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const request = httpsRequest(url, { rejectUnauthorized: false }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    });
+
+    request.on('error', reject);
+    request.setTimeout(15_000, () => request.destroy(new Error('GH apply request timeout')));
+    request.end();
+  });
+
+const fetchText = async (url: string, fetchImpl: GhFetch): Promise<string> => {
+  try {
+    const response = fetchImpl === fetch
+      ? await fetchImpl(url, { signal: AbortSignal.timeout(15_000) })
+      : await fetchImpl(url);
+    return await response.text();
+  } catch (error) {
+    if (fetchImpl === fetch && isGhApplyUrl(url) && isCertificateVerificationError(error)) {
+      return fetchGhApplyTextWithoutCertificateVerification(url);
+    }
+
+    throw error;
+  }
+};
+
 const decodeHtmlEntities = (value: string): string =>
   value
     .replace(/&amp;/gi, '&')
@@ -34,15 +81,19 @@ const decodeHtmlEntities = (value: string): string =>
     .replace(/&#039;|&#39;/gi, "'")
     .replace(/&e;/gi, 'e');
 
-const toAbsoluteGhUrl = (url: string): string => {
+const toAbsoluteUrl = (url: string, baseUrl: string): string => {
   const decodedUrl = decodeHtmlEntities(url);
 
   try {
-    return new URL(decodedUrl, GH_HOUSING_NOTICE_LIST_URL).toString();
+    return new URL(decodedUrl, baseUrl).toString();
   } catch {
     return decodedUrl;
   }
 };
+
+const toAbsoluteGhUrl = (url: string): string => toAbsoluteUrl(url, GH_HOUSING_NOTICE_LIST_URL);
+
+const toAbsoluteGhApplyUrl = (url: string): string => toAbsoluteUrl(url, GH_APPLY_RENT_NOTICE_LIST_URL);
 
 const extractCells = (rowHtml: string): string[] => {
   const matches = Array.from(rowHtml.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi));
@@ -53,6 +104,12 @@ const extractAttribute = (html: string, name: string): string | null => {
   const match = html.match(new RegExp(`${name}=["']([^"']*)["']`, 'i'));
   return match ? decodeHtmlEntities(match[1] ?? '') : null;
 };
+
+const extractRowTextLines = (rowHtml: string): string[] =>
+  rowHtml
+    .split(/\r?\n/g)
+    .map(stripHtml)
+    .filter((line) => line.length > 0 && line !== '확인');
 
 const normalizeGhDate = (value: string): string => {
   const match = value.match(/^(\d{2,4})[.-](\d{1,2})[.-](\d{1,2})$/);
@@ -185,8 +242,89 @@ export const parseGhNoticeListHtml = (html: string): RawNoticeCandidate[] => {
   return notices;
 };
 
+const extractApplyTitle = (rowHtml: string): string => {
+  const linkMatch = rowHtml.match(/<a\b[^>]*data-pbancNo=["']\d+["'][^>]*>([\s\S]*?)<\/a>/i);
+  return stripHtml(linkMatch?.[1] ?? '');
+};
+
+const normalizeApplyStatus = (value: string): string => {
+  if (value === '접수중') {
+    return '신청가능';
+  }
+  if (value === '접수마감') {
+    return '마감';
+  }
+  return value;
+};
+
+export const parseGhApplyNoticeListHtml = (html: string): RawNoticeCandidate[] => {
+  const rows = Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
+  const notices: RawNoticeCandidate[] = [];
+
+  for (const [, rowHtml] of rows) {
+    const pbancNo = extractAttribute(rowHtml, 'data-pbancNo');
+    const title = extractApplyTitle(rowHtml);
+    if (!pbancNo || !title || !isActionableNoticeTitle(title)) {
+      continue;
+    }
+
+    const textLines = extractRowTextLines(rowHtml);
+    const bizType = extractAttribute(rowHtml, 'data-bizTyNm') ?? textLines[1] ?? '임대주택';
+    const dates = textLines.filter((line) => /^\d{4}-\d{2}-\d{2}$/.test(line));
+    const status = normalizeApplyStatus(textLines.find((line) => /^(접수중|접수예정|접수마감|마감|공고중)$/.test(line)) ?? 'posted');
+    const firstDateIndex = textLines.findIndex((line) => /^\d{4}-\d{2}-\d{2}$/.test(line));
+    const locality = firstDateIndex > 0 ? textLines[firstDateIndex - 1] : '';
+    const sourceUrl = `${GH_APPLY_RENT_NOTICE_DETAIL_URL}?pbancNo=${encodeURIComponent(pbancNo)}`;
+    const rawIds = { pbancNo };
+
+    notices.push({
+      sourceId: `apply-${pbancNo}`,
+      title,
+      status,
+      region: '경기',
+      postedAt: dates[0],
+      applicationEndAt: dates[1],
+      sourceUrl,
+      metadata: {
+        provider: GH_PROVIDER,
+        channel: 'apply-center',
+        category: '임대주택',
+        ...(locality ? { locality } : {}),
+        skipDocumentText: true,
+        rawIds,
+      },
+      listings: [
+        {
+          title,
+          supplyType: bizType,
+          region: '경기',
+          status,
+          metadata: {
+            ...(locality ? { locality } : {}),
+            rawIds,
+          },
+        },
+      ],
+    });
+  }
+
+  return notices;
+};
+
+const extractApplyAttachments = (html: string): Array<{ title: string; url: string }> => {
+  const attachments = Array.from(html.matchAll(/<a\b[^>]*href=["']([^"']*selectFileDown\.do[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi))
+    .map(([, href, title]) => ({
+      title: stripHtml(title ?? '').replace(/\s*\(\d+\s*Byte\)\s*$/i, ''),
+      url: toAbsoluteGhApplyUrl(href ?? ''),
+    }))
+    .filter((attachment) => attachment.title.length > 0 && attachment.url.length > 0);
+
+  return preferPdfAttachments(attachments);
+};
+
 export const parseGhNoticeDetailHtml = (html: string, notice: RawNoticeCandidate): RawNoticeCandidate => {
-  const attachments = extractAttachments(html);
+  const isApplyCenter = notice.metadata?.channel === 'apply-center';
+  const attachments = isApplyCenter ? extractApplyAttachments(html) : extractAttachments(html);
   const primaryApplicationAttachment = findPrimaryApplicationAttachment(attachments);
   const bodyPreview = extractBodyPreview(html);
   const eligibilityRequirements = extractEligibilityRequirementsFromText(stripHtml(html));
@@ -229,15 +367,16 @@ const GH_FIXTURE: RawNoticeCandidate[] = [
 
 export const createGhAdapter = (options: CreateGhAdapterOptions = {}): SourceAdapter => {
   const fetchImpl = options.fetch ?? fetch;
+  const fetchApplyDetails = options.fetchApplyDetails ?? false;
   const useFixtureFallback = options.useFixtureFallback ?? false;
   const noticesById = new Map<string, RawNoticeCandidate>();
 
   return {
     source: 'gh',
     async fetchNotices() {
-      const response = await fetchImpl(GH_HOUSING_NOTICE_LIST_URL);
-      const html = await response.text();
-      const notices = parseGhNoticeListHtml(html);
+      const html = await fetchText(GH_HOUSING_NOTICE_LIST_URL, fetchImpl);
+      const applyHtml = await fetchText(GH_APPLY_RENT_NOTICE_LIST_URL, fetchImpl);
+      const notices = [...parseGhNoticeListHtml(html), ...parseGhApplyNoticeListHtml(applyHtml)];
       const result = notices.length > 0 || !useFixtureFallback ? notices : GH_FIXTURE;
       noticesById.clear();
       result.forEach((notice) => noticesById.set(notice.sourceId, notice));
@@ -249,8 +388,17 @@ export const createGhAdapter = (options: CreateGhAdapterOptions = {}): SourceAda
         return notice ?? null;
       }
 
-      const response = await fetchImpl(notice.sourceUrl);
-      const html = await response.text();
+      if (notice.metadata?.channel === 'apply-center' && !fetchApplyDetails) {
+        return {
+          ...notice,
+          metadata: {
+            ...(notice.metadata ?? {}),
+            detailSkipped: 'apply-center-default',
+          },
+        };
+      }
+
+      const html = await fetchText(notice.sourceUrl, fetchImpl);
       return parseGhNoticeDetailHtml(html, notice);
     },
   };
