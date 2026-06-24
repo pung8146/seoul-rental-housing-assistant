@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 .worktrees/
+public/
 *.sqlite
 *.db
 .env

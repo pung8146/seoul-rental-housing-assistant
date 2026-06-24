@@ -9,6 +9,9 @@
     "build": "tsc -p tsconfig.json",
     "collect": "tsx src/app/run-collect.ts",
     "collect:notify": "tsx src/app/run-collect-and-notify.ts",
+    "export:public-feed": "tsx src/public-feed/export-public-feed.ts",
+    "build:public-dashboard": "tsx src/public-dashboard/build.ts",
+    "dev": "tsx src/public-dashboard/dev-server.ts",
     "query": "tsx src/app/run-query.ts",
     "answer": "tsx src/app/run-assistant.ts",
     "dashboard": "tsx src/app/dashboard-server.ts"
