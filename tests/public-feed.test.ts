@@ -44,6 +44,37 @@ const ghListing: Listing = {
   metadata: {},
 };
 
+const shNotice: Notice = {
+  source: 'sh',
+  sourceId: '306011',
+  title: '2026년 가양동 육아 협동조합주택(이음채) 잔여세대 입주자 모집공고(2026. 6. 23.)',
+  stableKey: 'notice:sh:306011',
+  changeHash: 'sh-hash',
+  status: 'posted',
+  region: '서울',
+  targetTags: ['도시형생활주택'],
+  postedAt: '2026-06-23',
+  applicationStartAt: null,
+  applicationEndAt: null,
+  sourceUrl: 'https://www.i-sh.co.kr/main/lay2/program/S1T294C297/www/brd/m_247/view.do?multi_itm_seq=2&seq=306011',
+  metadata: {
+    provider: 'SH',
+    attachments: [{ title: '공고문.pdf', url: 'https://example.com/sh.pdf' }],
+  },
+};
+
+const seoulHousingDuplicateNotice: Notice = {
+  ...shNotice,
+  source: 'seoul-housing',
+  stableKey: 'notice:seoul-housing:306011',
+  changeHash: 'seoul-housing-hash',
+  sourceUrl: 'https://www.i-sh.co.kr/main/lay2/program/S1T294C295/www/brd/m_241/view.do?seq=306011',
+  metadata: {
+    provider: '서울주거포털',
+    attachments: [],
+  },
+};
+
 describe('public feed export', () => {
   it('exports GH notices in the public dashboard schema', () => {
     const feed = buildPublicFeed({
@@ -107,6 +138,24 @@ describe('public feed export', () => {
     });
 
     expect(feed.notices[0]?.metadata.attachments).toEqual([]);
+  });
+
+  it('deduplicates Seoul Housing portal notices when SH has the same notice seq', () => {
+    const feed = buildPublicFeed({
+      generatedAt: '2026-06-24T10:00:00.000Z',
+      notices: [seoulHousingDuplicateNotice, shNotice],
+      getListings: () => [],
+    });
+
+    expect(feed.notices).toHaveLength(1);
+    expect(feed.notices[0]).toMatchObject({
+      source: 'sh',
+      sourceId: '306011',
+      metadata: {
+        provider: 'SH',
+        attachments: [{ title: '공고문.pdf', url: 'https://example.com/sh.pdf' }],
+      },
+    });
   });
 
   it('keeps Korean notice type labels readable', () => {

@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { createRepository, type Repository } from '../db/repository.js';
+import { dedupeNoticesForDisplay } from '../domain/notice-dedupe.js';
 import type { Listing, Notice } from '../types.js';
 import { detectPublicNoticeTypes, type PublicNoticeTypeLabel } from './notice-type.js';
 
@@ -79,7 +80,7 @@ const toPublicNotice = (notice: Notice, listings: Listing[]): PublicFeedNotice =
 
 export const buildPublicFeed = ({ generatedAt = new Date().toISOString(), notices, getListings }: BuildPublicFeedInput): PublicFeed => ({
   generatedAt,
-  notices: notices.map((notice) => toPublicNotice(notice, getListings(notice.source, notice.sourceId))),
+  notices: dedupeNoticesForDisplay(notices).map((notice) => toPublicNotice(notice, getListings(notice.source, notice.sourceId))),
 });
 
 export const exportPublicFeed = async ({

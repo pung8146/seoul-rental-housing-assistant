@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createRepository } from '../db/repository.js';
+import { dedupeNoticesForDisplay } from '../domain/notice-dedupe.js';
 import { detectPublicNoticeTypes } from './notice-type.js';
 const toPublicListing = (listing) => ({
     title: listing.title,
@@ -34,7 +35,7 @@ const toPublicNotice = (notice, listings) => ({
 });
 export const buildPublicFeed = ({ generatedAt = new Date().toISOString(), notices, getListings }) => ({
     generatedAt,
-    notices: notices.map((notice) => toPublicNotice(notice, getListings(notice.source, notice.sourceId))),
+    notices: dedupeNoticesForDisplay(notices).map((notice) => toPublicNotice(notice, getListings(notice.source, notice.sourceId))),
 });
 export const exportPublicFeed = async ({ repository, outputPath, }) => {
     const feed = buildPublicFeed({

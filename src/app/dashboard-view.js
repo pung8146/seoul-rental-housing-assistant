@@ -1,5 +1,6 @@
 import { getNoticeExclusionReason } from '../domain/actionable.js';
 import { assessEligibility } from '../domain/eligibility.js';
+import { dedupeNoticesForDisplay } from '../domain/notice-dedupe.js';
 const toNoticeKey = (notice) => `${notice.source}:${notice.sourceId}`;
 const withNoticeKey = (notice, profile) => ({
     ...notice,
@@ -131,7 +132,7 @@ const buildNotificationStatus = (notificationHistory) => ({
     lastSentAt: notificationHistory[0]?.sentAt ?? null,
 });
 export const buildDashboardView = ({ repository, selectedNoticeKey, noticeTypeFilter = 'all', }) => {
-    const notices = repository.queryNotices({});
+    const notices = dedupeNoticesForDisplay(repository.queryNotices({}));
     const sourceRuns = repository.listSourceRuns();
     const notificationHistory = repository.listNotificationHistory();
     const profile = repository.getPersonalProfile();

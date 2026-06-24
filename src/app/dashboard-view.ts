@@ -1,5 +1,6 @@
 import { getNoticeExclusionReason, type NoticeExclusionReason } from '../domain/actionable.js';
 import { assessEligibility, type EligibilityAssessment } from '../domain/eligibility.js';
+import { dedupeNoticesForDisplay } from '../domain/notice-dedupe.js';
 import type { Listing, Notice, PersonalProfile, SourceRun } from '../types.js';
 import type { Repository } from '../db/repository.js';
 
@@ -256,7 +257,7 @@ export const buildDashboardView = ({
   selectedNoticeKey,
   noticeTypeFilter = 'all',
 }: BuildDashboardViewInput): DashboardView => {
-  const notices = repository.queryNotices({});
+  const notices = dedupeNoticesForDisplay(repository.queryNotices({}));
   const sourceRuns = repository.listSourceRuns();
   const notificationHistory = repository.listNotificationHistory();
   const profile = repository.getPersonalProfile();
