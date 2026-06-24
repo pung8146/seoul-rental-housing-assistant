@@ -129,6 +129,34 @@ const ghApplyDetailHtml = `
   </main>
 `;
 
+const ghApplyPurchaseListHtml = `
+  <table>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>매입임대</td>
+        <td>
+          <a href="#a" class="text_cut"
+            data-previewYn="0"
+            data-pbancNo="795"
+            data-pbancKndCd="01"
+            data-bizTyNm="매입임대"
+          >
+            26년 매입임대주택 입주자 모집공고(자격완화)
+          </a>
+        </td>
+        <td>경기도</td>
+        <td><img src="/images/sub/pdf.png" alt="pdf파일"></td>
+        <td>2026-06-15</td>
+        <td>2026-07-03</td>
+        <td>공고중</td>
+        <td><button type="button" class="btn_normal" data-pbancNo="795" data-molTyCd="02" data-bizTyCd="06">확인</button></td>
+        <td>54078</td>
+      </tr>
+    </tbody>
+  </table>
+`;
+
 describe('GH adapter', () => {
   it('parses actionable GH housing notices and excludes result announcements', () => {
     const notices = parseGhNoticeListHtml(ghListHtml);
@@ -161,10 +189,20 @@ describe('GH adapter', () => {
     const requestedUrls: string[] = [];
     const adapter = createGhAdapter({
       fetch: (async (url: string | URL | Request) => {
-        requestedUrls.push(String(url));
+        const requestUrl = String(url);
+        requestedUrls.push(requestUrl);
         return {
           async text() {
-            return requestedUrls.length === 1 ? ghListHtml : requestedUrls.length === 2 ? ghApplyListHtml : ghDetailHtml;
+            if (requestUrl.includes('sr7150/selectPbancRentHouseList.do')) {
+              return ghApplyListHtml;
+            }
+            if (requestUrl.includes('sr7155/selectPbancRentHouseList.do')) {
+              return ghApplyPurchaseListHtml;
+            }
+            if (requestUrl.includes('announcement-of-salerental001.do?srCategoryId=12')) {
+              return ghListHtml;
+            }
+            return ghDetailHtml;
           },
         } as Response;
       }) as typeof fetch,
@@ -179,7 +217,8 @@ describe('GH adapter', () => {
 
     expect(requestedUrls[0]).toBe('https://gh.or.kr/gh/announcement-of-salerental001.do?srCategoryId=12');
     expect(requestedUrls[1]).toBe('https://apply.gh.or.kr/sb/sr/sr7150/selectPbancRentHouseList.do');
-    expect(requestedUrls[2]).toBe(notices[0]!.sourceUrl);
+    expect(requestedUrls[2]).toBe('https://apply.gh.or.kr/sb/sr/sr7155/selectPbancRentHouseList.do');
+    expect(requestedUrls[3]).toBe(notices[0]!.sourceUrl);
     expect(detailedNotice).toMatchObject({
       sourceId: '64847',
       title: '다산 센트럴파크6단지 영구임대주택 예비입주자 모집 공고',
@@ -216,22 +255,32 @@ describe('GH adapter', () => {
     const adapter = createGhAdapter({
       fetchApplyDetails: true,
       fetch: (async (url: string | URL | Request) => {
-        requestedUrls.push(String(url));
+        const requestUrl = String(url);
+        requestedUrls.push(requestUrl);
         return {
           async text() {
-            return requestedUrls.length === 1 ? '<table></table>' : requestedUrls.length === 2 ? ghApplyListHtml : ghApplyDetailHtml;
+            if (requestUrl.includes('sr7150/selectPbancRentHouseList.do')) {
+              return ghApplyListHtml;
+            }
+            if (requestUrl.includes('sr7155/selectPbancRentHouseList.do')) {
+              return '<table></table>';
+            }
+            if (requestUrl.includes('selectPbancDetailView.do')) {
+              return ghApplyDetailHtml;
+            }
+            return '<table></table>';
           },
         } as Response;
       }) as typeof fetch,
     });
 
     const notices = await adapter.fetchNotices();
-    const notice = notices.find((item) => item.sourceId === 'apply-793');
-    const detailedNotice = await adapter.fetchNoticeDetails?.('apply-793');
+    const notice = notices.find((item) => item.sourceId === 'apply-rent-793');
+    const detailedNotice = await adapter.fetchNoticeDetails?.('apply-rent-793');
     const metadata = detailedNotice?.metadata ?? {};
 
     expect(notice).toMatchObject({
-      sourceId: 'apply-793',
+      sourceId: 'apply-rent-793',
       title: '(최초) 다산지금A3 통합공공임대주택 입주자 모집 공고',
       status: '신청가능',
       region: '경기',
@@ -259,6 +308,43 @@ describe('GH adapter', () => {
     });
     expect(metadata.locality).toBe('남양주시');
     expect(metadata.rawIds).toEqual({ pbancNo: '793' });
+  });
+
+  it('collects GH apply center purchase rental notices separately from rental notices', async () => {
+    const requestedUrls: string[] = [];
+    const adapter = createGhAdapter({
+      fetch: (async (url: string | URL | Request) => {
+        const requestUrl = String(url);
+        requestedUrls.push(requestUrl);
+        return {
+          async text() {
+            return requestUrl.includes('sr7155/selectPbancRentHouseList.do') ? ghApplyPurchaseListHtml : '<table></table>';
+          },
+        } as Response;
+      }) as typeof fetch,
+    });
+
+    const notices = await adapter.fetchNotices();
+
+    expect(notices[0]).toMatchObject({
+      sourceId: 'apply-purchase-795',
+      title: '26년 매입임대주택 입주자 모집공고(자격완화)',
+      status: '공고중',
+      region: '경기',
+      postedAt: '2026-06-15',
+      applicationEndAt: '2026-07-03',
+      sourceUrl: 'https://apply.gh.or.kr/sb/sr/sr7155/selectPbancDetailView.do?pbancNo=795',
+      metadata: {
+        category: '매입임대',
+        locality: '경기도',
+        rawIds: { pbancNo: '795' },
+      },
+    });
+    expect(notices[0]?.listings[0]).toMatchObject({
+      supplyType: '매입임대',
+      region: '경기',
+      status: '공고중',
+    });
   });
 
   it('keeps GH detail parsing safe when optional fields are absent', () => {

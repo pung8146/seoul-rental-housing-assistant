@@ -14,7 +14,7 @@ const makeNotice = (overrides: Partial<Notice> = {}): Notice => ({
   targetTags: ['청년', '신혼부부'],
   postedAt: '2026-05-07',
   applicationStartAt: '2026-05-10',
-  applicationEndAt: '2026-06-20',
+  applicationEndAt: '2026-12-20',
   sourceUrl: 'https://example.com/notices/1',
   metadata: {},
   ...overrides,
@@ -167,7 +167,7 @@ describe('formatNoticeDetails', () => {
     expect(details).toContain('서울 청년 임대주택 모집');
     expect(details).toContain('신청상태: 신청가능');
     expect(details).toContain('게시일: 2026-05-07');
-    expect(details).toContain('신청기간: 2026-05-10 ~ 2026-06-20');
+    expect(details).toContain('신청기간: 2026-05-10 ~ 2026-12-20');
     expect(details).toContain('상세 확인: 신청기간 확인됨 · 공고문 확인됨 · 신청조건 확인필요 · 매물정보 2건');
     expect(details).toContain('확인할 공고문: 공고문.pdf');
     expect(details).toContain('https://example.com/file.pdf');
@@ -181,7 +181,7 @@ describe('formatNoticeDetails', () => {
     const details = formatNoticeDetails(
       makeNotice({
         applicationStartAt: null,
-        applicationEndAt: '2026-06-20',
+        applicationEndAt: '2026-12-20',
         metadata: {
           attachments: [{ title: '첨부.zip', url: 'https://example.com/file.zip' }],
         },
@@ -189,7 +189,7 @@ describe('formatNoticeDetails', () => {
       [],
     );
 
-    expect(details).toContain('신청기간: 확인필요 ~ 2026-06-20');
+    expect(details).toContain('신청기간: 확인필요 ~ 2026-12-20');
     expect(details).toContain('상세 확인: 신청기간 일부 확인 · 공고문 첨부 있음 · 신청조건 확인필요 · 매물정보 확인필요');
   });
 });

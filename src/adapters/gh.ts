@@ -11,6 +11,30 @@ const GH_HOUSING_NOTICE_LIST_URL = 'https://gh.or.kr/gh/announcement-of-salerent
 const GH_APPLY_ORIGIN = 'https://apply.gh.or.kr';
 const GH_APPLY_RENT_NOTICE_LIST_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7150/selectPbancRentHouseList.do`;
 const GH_APPLY_RENT_NOTICE_DETAIL_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7150/selectPbancDetailView.do`;
+const GH_APPLY_PURCHASE_NOTICE_LIST_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7155/selectPbancRentHouseList.do`;
+const GH_APPLY_PURCHASE_NOTICE_DETAIL_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7155/selectPbancDetailView.do`;
+
+type GhApplyNoticeSource = {
+  category: '임대주택' | '매입임대';
+  listUrl: string;
+  detailUrl: string;
+  sourceIdPrefix: 'apply-rent' | 'apply-purchase';
+};
+
+const GH_APPLY_NOTICE_SOURCES: GhApplyNoticeSource[] = [
+  {
+    category: '임대주택',
+    listUrl: GH_APPLY_RENT_NOTICE_LIST_URL,
+    detailUrl: GH_APPLY_RENT_NOTICE_DETAIL_URL,
+    sourceIdPrefix: 'apply-rent',
+  },
+  {
+    category: '매입임대',
+    listUrl: GH_APPLY_PURCHASE_NOTICE_LIST_URL,
+    detailUrl: GH_APPLY_PURCHASE_NOTICE_DETAIL_URL,
+    sourceIdPrefix: 'apply-purchase',
+  },
+];
 
 type GhFetch = typeof fetch;
 
@@ -257,7 +281,10 @@ const normalizeApplyStatus = (value: string): string => {
   return value;
 };
 
-export const parseGhApplyNoticeListHtml = (html: string): RawNoticeCandidate[] => {
+export const parseGhApplyNoticeListHtml = (
+  html: string,
+  source: GhApplyNoticeSource = GH_APPLY_NOTICE_SOURCES[0],
+): RawNoticeCandidate[] => {
   const rows = Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
   const notices: RawNoticeCandidate[] = [];
 
@@ -274,11 +301,11 @@ export const parseGhApplyNoticeListHtml = (html: string): RawNoticeCandidate[] =
     const status = normalizeApplyStatus(textLines.find((line) => /^(접수중|접수예정|접수마감|마감|공고중)$/.test(line)) ?? 'posted');
     const firstDateIndex = textLines.findIndex((line) => /^\d{4}-\d{2}-\d{2}$/.test(line));
     const locality = firstDateIndex > 0 ? textLines[firstDateIndex - 1] : '';
-    const sourceUrl = `${GH_APPLY_RENT_NOTICE_DETAIL_URL}?pbancNo=${encodeURIComponent(pbancNo)}`;
+    const sourceUrl = `${source.detailUrl}?pbancNo=${encodeURIComponent(pbancNo)}`;
     const rawIds = { pbancNo };
 
     notices.push({
-      sourceId: `apply-${pbancNo}`,
+      sourceId: `${source.sourceIdPrefix}-${pbancNo}`,
       title,
       status,
       region: '경기',
@@ -288,7 +315,7 @@ export const parseGhApplyNoticeListHtml = (html: string): RawNoticeCandidate[] =
       metadata: {
         provider: GH_PROVIDER,
         channel: 'apply-center',
-        category: '임대주택',
+        category: source.category,
         ...(locality ? { locality } : {}),
         skipDocumentText: true,
         rawIds,
@@ -375,8 +402,10 @@ export const createGhAdapter = (options: CreateGhAdapterOptions = {}): SourceAda
     source: 'gh',
     async fetchNotices() {
       const html = await fetchText(GH_HOUSING_NOTICE_LIST_URL, fetchImpl);
-      const applyHtml = await fetchText(GH_APPLY_RENT_NOTICE_LIST_URL, fetchImpl);
-      const notices = [...parseGhNoticeListHtml(html), ...parseGhApplyNoticeListHtml(applyHtml)];
+      const applyNoticeGroups = await Promise.all(
+        GH_APPLY_NOTICE_SOURCES.map(async (source) => parseGhApplyNoticeListHtml(await fetchText(source.listUrl, fetchImpl), source)),
+      );
+      const notices = [...parseGhNoticeListHtml(html), ...applyNoticeGroups.flat()];
       const result = notices.length > 0 || !useFixtureFallback ? notices : GH_FIXTURE;
       noticesById.clear();
       result.forEach((notice) => noticesById.set(notice.sourceId, notice));

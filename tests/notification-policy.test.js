@@ -24,7 +24,7 @@ const makeNotice = (overrides = {}) => ({
     targetTags: ['청년'],
     postedAt: '2026-05-09',
     applicationStartAt: '2026-05-10',
-    applicationEndAt: '2026-06-20',
+    applicationEndAt: '2026-12-20',
     sourceUrl: 'https://example.com/notice',
     metadata: {
         eligibilityRequirements: {
