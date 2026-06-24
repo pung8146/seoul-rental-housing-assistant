@@ -55,11 +55,11 @@ const html = `<!doctype html>
     const selectNotice = (id) => { state.selectedId = id; render(); };
     const renderFilters = () => {
       const sources = ['all', ...Array.from(new Set(state.feed.notices.map((notice) => notice.source))).sort()];
-      document.getElementById('sourceFilters').innerHTML = sources.map((source) => '<button class="' + (state.source === source ? 'active' : '') + '" onclick="setSource(\\'' + source + '\\')">' + escapeHtml(source === 'all' ? '전체' : source.toUpperCase()) + '</button>').join('');
+      document.getElementById('sourceFilters').innerHTML = sources.map((source) => '<button data-source="' + escapeHtml(source) + '" class="' + (state.source === source ? 'active' : '') + '">' + escapeHtml(source === 'all' ? '전체' : source.toUpperCase()) + '</button>').join('');
     };
     const renderList = () => {
       const notices = filteredNotices();
-      document.getElementById('noticeList').innerHTML = notices.map((notice) => '<button class="notice-row ' + (state.selectedId === noticeKey(notice) ? 'active' : '') + '" onclick="selectNotice(\\'' + noticeKey(notice) + '\\')"><strong>' + escapeHtml(notice.title) + '</strong><span class="meta">' + escapeHtml(notice.source.toUpperCase()) + ' · ' + escapeHtml(notice.region) + ' · ' + escapeHtml(notice.status) + ' · 게시 ' + escapeHtml(formatDate(notice.postedAt)) + '</span><span class="badges">' + notice.typeLabels.map((label) => '<span class="badge">' + escapeHtml(label) + '</span>').join('') + '</span></button>').join('');
+      document.getElementById('noticeList').innerHTML = notices.map((notice) => '<button data-notice-key="' + escapeHtml(noticeKey(notice)) + '" class="notice-row ' + (state.selectedId === noticeKey(notice) ? 'active' : '') + '"><strong>' + escapeHtml(notice.title) + '</strong><span class="meta">' + escapeHtml(notice.source.toUpperCase()) + ' · ' + escapeHtml(notice.region) + ' · ' + escapeHtml(notice.status) + ' · 게시 ' + escapeHtml(formatDate(notice.postedAt)) + '</span><span class="badges">' + notice.typeLabels.map((label) => '<span class="badge">' + escapeHtml(label) + '</span>').join('') + '</span></button>').join('');
       document.getElementById('summary').textContent = '전체 ' + state.feed.notices.length + '건 · 현재 ' + notices.length + '건';
     };
     const renderDetail = () => {
@@ -72,6 +72,14 @@ const html = `<!doctype html>
       document.getElementById('detail').innerHTML = '<div><h2>' + escapeHtml(notice.title) + '</h2><p class="meta">' + escapeHtml(notice.source.toUpperCase()) + ' · ' + escapeHtml(notice.region) + '</p></div><div class="detail-grid"><div class="field"><span>상태</span><strong>' + escapeHtml(notice.status) + '</strong></div><div class="field"><span>게시일</span><strong>' + escapeHtml(formatDate(notice.postedAt)) + '</strong></div><div class="field"><span>신청시작</span><strong>' + escapeHtml(formatDate(notice.applicationStartAt)) + '</strong></div><div class="field"><span>신청마감</span><strong>' + escapeHtml(formatDate(notice.applicationEndAt)) + '</strong></div></div><div class="field"><span>원문</span>' + (notice.sourceUrl ? '<a href="' + escapeHtml(notice.sourceUrl) + '">' + escapeHtml(notice.sourceUrl) + '</a>' : '-') + '</div><div><h3>첨부</h3>' + (attachments.length ? attachments.map((item) => '<div><a href="' + escapeHtml(item.url) + '">' + escapeHtml(item.title) + '</a></div>').join('') : '<p class="muted">첨부 없음</p>') + '</div><div><h3>매물</h3><div class="listing-grid">' + notice.listings.map((listing) => '<div class="listing"><span>' + escapeHtml(listing.supplyType || '유형') + '</span><strong>' + escapeHtml(listing.title) + '</strong><p class="meta">' + escapeHtml(listing.region) + ' · ' + escapeHtml(listing.status) + '</p></div>').join('') + '</div></div>';
     };
     const render = () => { renderFilters(); renderList(); renderDetail(); };
+    document.getElementById('sourceFilters').addEventListener('click', (event) => {
+      const source = event.target.closest('button')?.dataset?.source;
+      if (source) setSource(source);
+    });
+    document.getElementById('noticeList').addEventListener('click', (event) => {
+      const key = event.target.closest('button')?.dataset?.noticeKey;
+      if (key) selectNotice(key);
+    });
     fetch('/public-feed.json').then((response) => response.json()).then((feed) => {
       state.feed = feed;
       state.selectedId = feed.notices[0] ? noticeKey(feed.notices[0]) : null;
@@ -80,8 +88,6 @@ const html = `<!doctype html>
       document.getElementById('summary').textContent = 'public-feed.json 로드 실패';
       document.getElementById('detail').innerHTML = '<p class="muted">' + escapeHtml(error.message) + '</p>';
     });
-    window.setSource = setSource;
-    window.selectNotice = selectNotice;
   </script>
 </body>
 </html>

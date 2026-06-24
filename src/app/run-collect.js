@@ -2,6 +2,7 @@ import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
 import { createGhAdapter } from '../adapters/gh.js';
 import { createSocoAdapter } from '../adapters/soco.js';
+import { createSeoulHousingAdapter } from '../adapters/seoul-housing.js';
 import { createRepository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { findPrimaryApplicationAttachment } from '../domain/attachments.js';
@@ -24,6 +25,7 @@ export const createDefaultAdapters = () => [
     createShAdapter(),
     createGhAdapter(),
     createSocoAdapter(),
+    createSeoulHousingAdapter(),
 ];
 export const formatCollectResult = (result) => formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 const filterNoticesByRegion = (rawNotices, regions) => rawNotices.filter((notice) => {

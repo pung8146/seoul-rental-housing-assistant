@@ -106,7 +106,7 @@ const inferNoticeTypeLabels = (notice) => {
     if (/분양|공공분양|분양주택|사전청약/.test(text)) {
         labels.push('분양');
     }
-    else if (/임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대/.test(text)) {
+    else if (/임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대|도시형생활주택|두레주택/.test(text)) {
         labels.push('임대');
     }
     if (/신혼/.test(text)) {

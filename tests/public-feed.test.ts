@@ -115,4 +115,10 @@ describe('public feed export', () => {
       '청년',
     ]);
   });
+
+  it('classifies Seoul Housing special public lease types as rent', () => {
+    expect(detectPublicNoticeTypes({ title: '협동조합주택 잔여세대 입주자 모집공고', targetTags: ['도시형생활주택'] })).toEqual([
+      '임대',
+    ]);
+  });
 });

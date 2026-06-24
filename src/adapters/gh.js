@@ -10,6 +10,8 @@ const GH_APPLY_RENT_NOTICE_LIST_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7150/selectPba
 const GH_APPLY_RENT_NOTICE_DETAIL_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7150/selectPbancDetailView.do`;
 const GH_APPLY_PURCHASE_NOTICE_LIST_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7155/selectPbancRentHouseList.do`;
 const GH_APPLY_PURCHASE_NOTICE_DETAIL_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7155/selectPbancDetailView.do`;
+const GH_APPLY_SHOP_NOTICE_LIST_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7170/selectPbancRentSopsrtList.do`;
+const GH_APPLY_SHOP_NOTICE_DETAIL_URL = `${GH_APPLY_ORIGIN}/sb/sr/sr7170/selectPbancDetailView.do`;
 const GH_APPLY_NOTICE_SOURCES = [
     {
         category: '임대주택',
@@ -22,6 +24,12 @@ const GH_APPLY_NOTICE_SOURCES = [
         listUrl: GH_APPLY_PURCHASE_NOTICE_LIST_URL,
         detailUrl: GH_APPLY_PURCHASE_NOTICE_DETAIL_URL,
         sourceIdPrefix: 'apply-purchase',
+    },
+    {
+        category: '임대상가',
+        listUrl: GH_APPLY_SHOP_NOTICE_LIST_URL,
+        detailUrl: GH_APPLY_SHOP_NOTICE_DETAIL_URL,
+        sourceIdPrefix: 'apply-shop',
     },
 ];
 const stripHtml = (html) => decodeHtmlEntities(html
@@ -234,11 +242,13 @@ export const parseGhApplyNoticeListHtml = (html, source = GH_APPLY_NOTICE_SOURCE
         const locality = firstDateIndex > 0 ? textLines[firstDateIndex - 1] : '';
         const sourceUrl = `${source.detailUrl}?pbancNo=${encodeURIComponent(pbancNo)}`;
         const rawIds = { pbancNo };
+        const targetTags = source.category === '임대상가' ? ['상가임대'] : undefined;
         notices.push({
             sourceId: `${source.sourceIdPrefix}-${pbancNo}`,
             title,
             status,
             region: '경기',
+            ...(targetTags ? { targetTags } : {}),
             postedAt: dates[0],
             applicationEndAt: dates[1],
             sourceUrl,
@@ -255,6 +265,7 @@ export const parseGhApplyNoticeListHtml = (html, source = GH_APPLY_NOTICE_SOURCE
                     title,
                     supplyType: bizType,
                     region: '경기',
+                    ...(targetTags ? { targetTags } : {}),
                     status,
                     metadata: {
                         ...(locality ? { locality } : {}),

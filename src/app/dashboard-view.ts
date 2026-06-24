@@ -153,7 +153,7 @@ const isSaleNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
   /분양|공공분양|분양주택|사전청약/.test(noticeSearchText(notice));
 
 const isRentNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
-  !isSaleNotice(notice) && /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대/.test(noticeSearchText(notice));
+  !isSaleNotice(notice) && /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대|도시형생활주택|두레주택/.test(noticeSearchText(notice));
 
 const filterNoticeByType = (notice: DashboardNoticeSummary, filter: DashboardNoticeTypeFilter): boolean => {
   if (filter === 'sale') {

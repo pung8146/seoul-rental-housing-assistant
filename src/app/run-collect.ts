@@ -4,6 +4,7 @@ import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
 import { createGhAdapter } from '../adapters/gh.js';
 import { createSocoAdapter } from '../adapters/soco.js';
+import { createSeoulHousingAdapter } from '../adapters/seoul-housing.js';
 import { createRepository, type Repository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { findPrimaryApplicationAttachment, type Attachment } from '../domain/attachments.js';
@@ -48,6 +49,7 @@ export const createDefaultAdapters = (): SourceAdapter[] => [
   createShAdapter(),
   createGhAdapter(),
   createSocoAdapter(),
+  createSeoulHousingAdapter(),
 ];
 
 export const formatCollectResult = (result: RunCollectResult): string =>

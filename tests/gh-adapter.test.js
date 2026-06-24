@@ -150,6 +150,33 @@ const ghApplyPurchaseListHtml = `
     </tbody>
   </table>
 `;
+const ghApplyShopListHtml = `
+  <table>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>상가임대</td>
+        <td>
+          <a href="#a" class="text_cut"
+            data-previewYn="0"
+            data-pbancNo="799"
+            data-pbancKndCd="04"
+            data-bizTyNm="상가임대"
+          >
+            (선착순수의계약) 안성청사복합 통합공공임대주택 단지 내 일반형 임대상가 임차인 모집 공고
+          </a>
+        </td>
+        <td>안성시</td>
+        <td><img src="/images/sub/pdf.png" alt="pdf파일"></td>
+        <td>2026-06-20</td>
+        <td>2026-07-04</td>
+        <td>공고중</td>
+        <td><button type="button" class="btn_normal" data-pbancNo="799" data-bizTyCd="04">확인</button></td>
+        <td>1200</td>
+      </tr>
+    </tbody>
+  </table>
+`;
 describe('GH adapter', () => {
     it('parses actionable GH housing notices and excludes result announcements', () => {
         const notices = parseGhNoticeListHtml(ghListHtml);
@@ -189,6 +216,9 @@ describe('GH adapter', () => {
                         if (requestUrl.includes('sr7155/selectPbancRentHouseList.do')) {
                             return ghApplyPurchaseListHtml;
                         }
+                        if (requestUrl.includes('sr7170/selectPbancRentSopsrtList.do')) {
+                            return ghApplyShopListHtml;
+                        }
                         if (requestUrl.includes('announcement-of-salerental001.do?srCategoryId=12')) {
                             return ghListHtml;
                         }
@@ -205,7 +235,8 @@ describe('GH adapter', () => {
         expect(requestedUrls[0]).toBe('https://gh.or.kr/gh/announcement-of-salerental001.do?srCategoryId=12');
         expect(requestedUrls[1]).toBe('https://apply.gh.or.kr/sb/sr/sr7150/selectPbancRentHouseList.do');
         expect(requestedUrls[2]).toBe('https://apply.gh.or.kr/sb/sr/sr7155/selectPbancRentHouseList.do');
-        expect(requestedUrls[3]).toBe(notices[0].sourceUrl);
+        expect(requestedUrls[3]).toBe('https://apply.gh.or.kr/sb/sr/sr7170/selectPbancRentSopsrtList.do');
+        expect(requestedUrls[4]).toBe(notices[0].sourceUrl);
         expect(detailedNotice).toMatchObject({
             sourceId: '64847',
             title: '다산 센트럴파크6단지 영구임대주택 예비입주자 모집 공고',
@@ -249,6 +280,9 @@ describe('GH adapter', () => {
                             return ghApplyListHtml;
                         }
                         if (requestUrl.includes('sr7155/selectPbancRentHouseList.do')) {
+                            return '<table></table>';
+                        }
+                        if (requestUrl.includes('sr7170/selectPbancRentSopsrtList.do')) {
                             return '<table></table>';
                         }
                         if (requestUrl.includes('selectPbancDetailView.do')) {
@@ -323,6 +357,37 @@ describe('GH adapter', () => {
         });
         expect(notices[0]?.listings[0]).toMatchObject({
             supplyType: '매입임대',
+            region: '경기',
+            status: '공고중',
+        });
+    });
+    it('collects GH apply center rental shop notices as a separate source id group', async () => {
+        const adapter = createGhAdapter({
+            fetch: (async (url) => ({
+                async text() {
+                    return String(url).includes('sr7170/selectPbancRentSopsrtList.do') ? ghApplyShopListHtml : '<table></table>';
+                },
+            })),
+        });
+        const notices = await adapter.fetchNotices();
+        expect(notices[0]).toMatchObject({
+            sourceId: 'apply-shop-799',
+            title: '(선착순수의계약) 안성청사복합 통합공공임대주택 단지 내 일반형 임대상가 임차인 모집 공고',
+            status: '공고중',
+            region: '경기',
+            targetTags: ['상가임대'],
+            postedAt: '2026-06-20',
+            applicationEndAt: '2026-07-04',
+            sourceUrl: 'https://apply.gh.or.kr/sb/sr/sr7170/selectPbancDetailView.do?pbancNo=799',
+            metadata: {
+                category: '임대상가',
+                locality: '안성시',
+                rawIds: { pbancNo: '799' },
+            },
+        });
+        expect(notices[0]?.listings[0]).toMatchObject({
+            supplyType: '상가임대',
+            targetTags: ['상가임대'],
             region: '경기',
             status: '공고중',
         });

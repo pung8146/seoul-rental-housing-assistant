@@ -58,7 +58,7 @@ const groupNoticesByPriority = (notices) => {
 };
 const noticeSearchText = (notice) => [notice.title, ...notice.targetTags].join(' ');
 const isSaleNotice = (notice) => /분양|공공분양|분양주택|사전청약/.test(noticeSearchText(notice));
-const isRentNotice = (notice) => !isSaleNotice(notice) && /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대/.test(noticeSearchText(notice));
+const isRentNotice = (notice) => !isSaleNotice(notice) && /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대|도시형생활주택|두레주택/.test(noticeSearchText(notice));
 const filterNoticeByType = (notice, filter) => {
     if (filter === 'sale') {
         return isSaleNotice(notice);
