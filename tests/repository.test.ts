@@ -41,8 +41,8 @@ const makeListing = (overrides: Partial<Listing> = {}): Listing => ({
 });
 
 describe('sqlite repository', () => {
-  it('uses LH and SH as the default collection adapters', () => {
-    expect(createDefaultAdapters().map((adapter) => adapter.source)).toEqual(['lh', 'sh', 'gh']);
+  it('uses all default collection adapters', () => {
+    expect(createDefaultAdapters().map((adapter) => adapter.source)).toEqual(['lh', 'sh', 'gh', 'soco']);
   });
 
   it('formats collection results as a Telegram-ready summary', () => {

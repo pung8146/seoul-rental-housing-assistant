@@ -3,6 +3,7 @@ import type { RawNoticeCandidate } from '../adapters/base.js';
 import { createLhAdapter } from '../adapters/lh.js';
 import { createShAdapter } from '../adapters/sh.js';
 import { createGhAdapter } from '../adapters/gh.js';
+import { createSocoAdapter } from '../adapters/soco.js';
 import { createRepository, type Repository } from '../db/repository.js';
 import { diffNoticeAndListings, shouldSnapshotListingEvent } from '../domain/diff.js';
 import { findPrimaryApplicationAttachment, type Attachment } from '../domain/attachments.js';
@@ -42,7 +43,12 @@ const DOCUMENT_FETCH_TIMEOUT_MS = 15_000;
 const DEFAULT_COLLECT_REGIONS = ['서울', '경기'];
 const EMPTY_COLLECT_MESSAGE = '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.';
 
-export const createDefaultAdapters = (): SourceAdapter[] => [createLhAdapter(), createShAdapter(), createGhAdapter()];
+export const createDefaultAdapters = (): SourceAdapter[] => [
+  createLhAdapter(),
+  createShAdapter(),
+  createGhAdapter(),
+  createSocoAdapter(),
+];
 
 export const formatCollectResult = (result: RunCollectResult): string =>
   formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
