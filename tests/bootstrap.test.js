@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createDefaultAdapters } from '../src/app/run-collect.js';
 import { describe, it, expect } from 'vitest';
 describe('project bootstrap', () => {
     it('runs vitest', () => {
@@ -15,5 +16,22 @@ describe('project bootstrap', () => {
         expect(script).toContain('RENTAL_HOUSING_DB_PATH');
         expect(script).toContain('RENTAL_HOUSING_CONTEXT_PATH');
         expect(script).toContain('npm run answer -- "$@"');
+    });
+    it('adds ApplyHome to default collection only when configured', () => {
+        const previousKey = process.env.CHUNGYAK_HOME_SERVICE_KEY;
+        try {
+            delete process.env.CHUNGYAK_HOME_SERVICE_KEY;
+            expect(createDefaultAdapters().map((adapter) => adapter.source)).not.toContain('applyhome');
+            process.env.CHUNGYAK_HOME_SERVICE_KEY = 'test-key';
+            expect(createDefaultAdapters().map((adapter) => adapter.source)).toContain('applyhome');
+        }
+        finally {
+            if (previousKey == null) {
+                delete process.env.CHUNGYAK_HOME_SERVICE_KEY;
+            }
+            else {
+                process.env.CHUNGYAK_HOME_SERVICE_KEY = previousKey;
+            }
+        }
     });
 });

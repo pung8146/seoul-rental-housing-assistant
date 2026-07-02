@@ -1,6 +1,6 @@
 # 서울 임대주택 어시스턴트
 
-LH/SH 임대주택 공고를 수집해 SQLite에 저장하고, 텔레그램에 바로 보낼 수 있는 짧은 응답을 만드는 Node.js 앱입니다.
+LH/SH/GH/서울주거포털/청약홈 등 주거 공고를 수집해 SQLite에 저장하고, 텔레그램에 바로 보낼 수 있는 짧은 응답을 만드는 Node.js 앱입니다.
 
 ## 빠른 점검
 
@@ -54,7 +54,7 @@ npm run collect -- --json
 npm run query -- 서울만 보여줘
 ```
 
-- `collect`: LH/SH에서 live 공고를 수집하고 텔레그램용 요약을 출력합니다.
+- `collect`: 등록된 수집처에서 live 공고를 수집하고 텔레그램용 요약을 출력합니다.
 - `collect:notify`: 수집 후 신규/변경/실패가 있을 때 텔레그램으로 자동 발송합니다.
 - `collect -- --json`: 기존 JSON 결과가 필요할 때 사용합니다.
 - `query`: 저장된 DB를 기준으로 사용자 문장을 조회합니다.
@@ -76,6 +76,8 @@ npm run query -- 서울만 보여줘
 - `--dry-run`을 붙이면 텔레그램 설정만 확인하고 실제 발송은 하지 않습니다.
 
 텔레그램 설정은 기본적으로 OpenClaw 설정(`/home/pung8146/.openclaw/openclaw.json`)의 Telegram 채널 정보를 사용합니다. 별도로 지정하려면 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 또는 `TELEGRAM_CHAT_IDS` 환경 변수를 사용합니다.
+
+청약홈 수집은 공공데이터포털 인증키가 필요합니다. `CHUNGYAK_HOME_SERVICE_KEY`를 설정하면 기본 수집처에 `applyhome`이 추가됩니다. 키가 없으면 청약홈 수집은 건너뛰어 실패 알림을 만들지 않습니다.
 
 Windows 작업 스케줄러 등록:
 
@@ -100,7 +102,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\pung8146\.
 
 ## 현재 구현 상태
 
-- LH/SH live 목록 수집
+- LH/SH/GH/서울주거포털/청약홈 live 목록 수집
 - LH 상세 링크 생성
 - SQLite 저장 및 변경 감지
 - 텔레그램용 수집 요약
@@ -109,4 +111,4 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\pung8146\.
 - OpenClaw/텔레그램 호출용 `answer` 진입점
 - LH 상세 테이블 기반 주택형/면적/보증금/월세 파싱
 
-다음 단계 후보는 SH 상세 페이지 파싱 또는 OpenClaw 에이전트 지침에 이 래퍼 호출 규칙을 등록하는 작업입니다.
+다음 단계 후보는 청약홈 인증키 설정 후 실제 수집 검증, 신청조건 추출 강화, 자동 운영 안정화입니다.
