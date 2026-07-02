@@ -172,6 +172,13 @@ describe('formatNoticeDetails', () => {
         expect(details).toContain('보증금 10,000,000원 / 월세 250,000원');
         expect(details).toContain('보증금 12,000,000원 / 월세 280,000원');
     });
+    it('adds notice type labels to detail replies', () => {
+        const details = formatNoticeDetails(makeNotice({
+            title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고',
+            targetTags: ['상가임대'],
+        }), []);
+        expect(details.split('\n')[0]).toBe('[상가] GH 복합시설관 일반형 임대상가 임차인 모집공고');
+    });
     it('flags partial or missing detail data so Telegram replies stay cautious', () => {
         const details = formatNoticeDetails(makeNotice({
             applicationStartAt: null,

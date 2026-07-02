@@ -270,7 +270,9 @@ export const formatNoticeDetails = (
   listings: Listing[],
   eligibility?: EligibilityAssessment,
 ): string => {
-  const lines = [notice.title];
+  const typeLabel = formatNoticeCategoryLabel(notice);
+  const title = typeLabel ? `[${typeLabel}] ${notice.title}` : notice.title;
+  const lines = [title];
   lines.push(`신청상태: ${getApplicationStatus(notice)}`);
   if (notice.postedAt) {
     lines.push(`게시일: ${notice.postedAt}`);
