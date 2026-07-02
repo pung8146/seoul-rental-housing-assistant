@@ -56,4 +56,28 @@ describe('dedupeNoticesForDisplay', () => {
             'sh:other',
         ]);
     });
+    it('keeps GH rental shop notices separate from general GH duplicates', () => {
+        const title = 'GH 복합시설관 일반형 임대시설 임차인 모집공고';
+        const notices = dedupeNoticesForDisplay([
+            makeNotice({
+                source: 'gh',
+                sourceId: '648122',
+                stableKey: 'notice:gh:648122',
+                title,
+                region: '경기',
+                targetTags: [],
+                postedAt: '2026-06-24',
+            }),
+            makeNotice({
+                source: 'gh',
+                sourceId: 'apply-shop-799',
+                stableKey: 'notice:gh:apply-shop-799',
+                title,
+                region: '경기',
+                targetTags: ['상가임대'],
+                postedAt: '2026-06-24',
+            }),
+        ]);
+        expect(notices.map((notice) => notice.sourceId)).toEqual(['648122', 'apply-shop-799']);
+    });
 });

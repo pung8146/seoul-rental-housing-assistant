@@ -318,6 +318,35 @@ describe('renderDashboardHtml', () => {
     expect(html).toContain('<strong>신혼부부 조건 확인</strong>');
   });
 
+  it('renders shop filter and shop badges separately from rental labels', () => {
+    const shopNotice = {
+      ...view.actionableNotices[0]!,
+      title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고',
+      targetTags: ['상가임대'],
+    };
+    const html = renderDashboardHtml({
+      ...view,
+      filters: {
+        noticeType: 'shop',
+      },
+      actionableNotices: [shopNotice],
+      noticeGroups: {
+        high: [shopNotice],
+        review: [],
+        low: [],
+      },
+      selectedNotice: {
+        ...view.selectedNotice!,
+        notice: shopNotice,
+      },
+    });
+
+    expect(html).toContain('<a class="active" href="/?type=shop">');
+    expect(html).toContain('상가 1건');
+    expect(html).toContain('<span class="type-badge">상가</span>');
+    expect(html).not.toContain('<span class="type-badge">임대</span>');
+  });
+
   it('does not render sale-specific preparation for rental notices', () => {
     const html = renderDashboardHtml(view);
 

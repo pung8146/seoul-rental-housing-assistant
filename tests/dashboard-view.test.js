@@ -151,8 +151,13 @@ describe('buildDashboardView', () => {
             title: '남양주왕숙2 A-3BL 공공분양주택 입주자모집공고',
             targetTags: ['분양', '신혼부부'],
         });
+        const shopNotice = makeNotice(3, {
+            title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고',
+            targetTags: ['상가임대'],
+        });
         repository.upsertNotice(rentNotice);
         repository.upsertNotice(saleNotice);
+        repository.upsertNotice(shopNotice);
         const saleView = buildDashboardView({
             repository,
             noticeTypeFilter: 'sale',
@@ -165,9 +170,19 @@ describe('buildDashboardView', () => {
             repository,
             noticeTypeFilter: 'youth',
         });
+        const rentView = buildDashboardView({
+            repository,
+            noticeTypeFilter: 'rent',
+        });
+        const shopView = buildDashboardView({
+            repository,
+            noticeTypeFilter: 'shop',
+        });
         expect(saleView.filters.noticeType).toBe('sale');
         expect(saleView.actionableNotices.map((notice) => notice.title)).toEqual([saleNotice.title]);
         expect(newlywedView.actionableNotices.map((notice) => notice.title)).toEqual([saleNotice.title]);
         expect(youthView.actionableNotices.map((notice) => notice.title)).toEqual([rentNotice.title]);
+        expect(rentView.actionableNotices.map((notice) => notice.title)).toEqual([rentNotice.title]);
+        expect(shopView.actionableNotices.map((notice) => notice.title)).toEqual([shopNotice.title]);
     });
 });

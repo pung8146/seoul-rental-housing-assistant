@@ -11,6 +11,12 @@ const normalizeTitle = (title: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const noticeSearchText = (notice: Pick<Notice, 'title' | 'targetTags'>): string =>
+  [notice.title, ...notice.targetTags].join(' ');
+
+const isShopNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
+  /상가임대|임대상가/.test(noticeSearchText(notice));
+
 const getShSeq = (notice: Notice): string | null => {
   if ((notice.source === 'sh' || notice.source === 'seoul-housing') && /^\d+$/.test(notice.sourceId)) {
     return notice.sourceId;
@@ -33,7 +39,8 @@ const getDedupeKey = (notice: Notice): string => {
     return `sh-seq:${shSeq}`;
   }
 
-  return `title:${normalizeTitle(notice.title)}:${notice.postedAt ?? ''}:${notice.region ?? ''}`;
+  const noticeKind = isShopNotice(notice) ? 'shop' : 'general';
+  return `title:${noticeKind}:${normalizeTitle(notice.title)}:${notice.postedAt ?? ''}:${notice.region ?? ''}`;
 };
 
 const attachmentCount = (notice: Notice): number => {

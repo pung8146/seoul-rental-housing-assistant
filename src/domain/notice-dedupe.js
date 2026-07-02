@@ -6,6 +6,8 @@ const normalizeTitle = (title) => title
     .replace(/^\[수정\]\s*/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+const noticeSearchText = (notice) => [notice.title, ...notice.targetTags].join(' ');
+const isShopNotice = (notice) => /상가임대|임대상가/.test(noticeSearchText(notice));
 const getShSeq = (notice) => {
     if ((notice.source === 'sh' || notice.source === 'seoul-housing') && /^\d+$/.test(notice.sourceId)) {
         return notice.sourceId;
@@ -24,7 +26,8 @@ const getDedupeKey = (notice) => {
     if (shSeq) {
         return `sh-seq:${shSeq}`;
     }
-    return `title:${normalizeTitle(notice.title)}:${notice.postedAt ?? ''}:${notice.region ?? ''}`;
+    const noticeKind = isShopNotice(notice) ? 'shop' : 'general';
+    return `title:${noticeKind}:${normalizeTitle(notice.title)}:${notice.postedAt ?? ''}:${notice.region ?? ''}`;
 };
 const attachmentCount = (notice) => {
     const attachments = notice.metadata.attachments;

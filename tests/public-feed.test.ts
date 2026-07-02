@@ -170,4 +170,10 @@ describe('public feed export', () => {
       '임대',
     ]);
   });
+
+  it('classifies rental shop notices as shop, not rent', () => {
+    expect(detectPublicNoticeTypes({ title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고', targetTags: ['상가임대'] })).toEqual([
+      '상가',
+    ]);
+  });
 });

@@ -21,7 +21,7 @@ const redirectTo = (response, location) => {
 };
 const toUrl = (request) => new URL(request.url ?? '/', 'http://127.0.0.1');
 const parseNoticeTypeFilter = (value) => {
-    if (value === 'sale' || value === 'rent' || value === 'newlywed' || value === 'youth') {
+    if (value === 'sale' || value === 'rent' || value === 'shop' || value === 'newlywed' || value === 'youth') {
         return value;
     }
     return 'all';

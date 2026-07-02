@@ -13,7 +13,7 @@ export type DashboardNoticePriority = 'high' | 'review' | 'low';
 
 export type DashboardNoticeGroups = Record<DashboardNoticePriority, DashboardNoticeSummary[]>;
 
-export type DashboardNoticeTypeFilter = 'all' | 'sale' | 'rent' | 'newlywed' | 'youth';
+export type DashboardNoticeTypeFilter = 'all' | 'sale' | 'rent' | 'shop' | 'newlywed' | 'youth';
 
 export type ExcludedDashboardNotice = DashboardNoticeSummary & {
   exclusionReason: NoticeExclusionReason;
@@ -153,8 +153,13 @@ const noticeSearchText = (notice: Pick<Notice, 'title' | 'targetTags'>): string 
 const isSaleNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
   /분양|공공분양|분양주택|사전청약/.test(noticeSearchText(notice));
 
+const isShopNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
+  /상가임대|임대상가/.test(noticeSearchText(notice));
+
 const isRentNotice = (notice: Pick<Notice, 'title' | 'targetTags'>): boolean =>
-  !isSaleNotice(notice) && /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대|도시형생활주택|두레주택/.test(noticeSearchText(notice));
+  !isSaleNotice(notice) &&
+  !isShopNotice(notice) &&
+  /임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대|도시형생활주택|두레주택/.test(noticeSearchText(notice));
 
 const filterNoticeByType = (notice: DashboardNoticeSummary, filter: DashboardNoticeTypeFilter): boolean => {
   if (filter === 'sale') {
@@ -162,6 +167,9 @@ const filterNoticeByType = (notice: DashboardNoticeSummary, filter: DashboardNot
   }
   if (filter === 'rent') {
     return isRentNotice(notice);
+  }
+  if (filter === 'shop') {
+    return isShopNotice(notice);
   }
   if (filter === 'newlywed') {
     return noticeSearchText(notice).includes('신혼');

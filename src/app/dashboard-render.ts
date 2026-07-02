@@ -109,6 +109,7 @@ const NOTICE_TYPE_FILTERS: Array<{ value: DashboardNoticeTypeFilter; label: stri
   { value: 'all', label: '전체' },
   { value: 'sale', label: '분양' },
   { value: 'rent', label: '임대' },
+  { value: 'shop', label: '상가' },
   { value: 'newlywed', label: '신혼부부' },
   { value: 'youth', label: '청년' },
 ];
@@ -117,6 +118,7 @@ const NOTICE_TYPE_LABELS: Record<DashboardNoticeTypeFilter, string> = {
   all: '전체',
   sale: '분양',
   rent: '임대',
+  shop: '상가',
   newlywed: '신혼부부',
   youth: '청년',
 };
@@ -135,7 +137,9 @@ const noticeHref = (noticeKey: string, filter: DashboardNoticeTypeFilter): strin
 const inferNoticeTypeLabels = (notice: Pick<Notice, 'title' | 'targetTags'>): string[] => {
   const text = [notice.title, ...notice.targetTags].join(' ');
   const labels: string[] = [];
-  if (/분양|공공분양|분양주택|사전청약/.test(text)) {
+  if (/상가임대|임대상가/.test(text)) {
+    labels.push('상가');
+  } else if (/분양|공공분양|분양주택|사전청약/.test(text)) {
     labels.push('분양');
   } else if (/임대|행복주택|장기전세|전세임대|매입임대|국민임대|공공임대|도시형생활주택|두레주택/.test(text)) {
     labels.push('임대');
