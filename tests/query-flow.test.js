@@ -233,6 +233,34 @@ describe('runQuery', () => {
         expect(result.text).toContain('접수예정 임대주택');
         expect(result.text).not.toContain('마감 임대주택');
     });
+    it('excludes requested notice types when filtering by 빼고 or 제외', () => {
+        const repository = createRepository(':memory:');
+        const rentalNotice = makeNotice(1, {
+            title: '서울 청년 매입임대주택 입주자 모집공고',
+            targetTags: ['청년', '매입임대'],
+            postedAt: '2026-05-13',
+        });
+        const saleNotice = makeNotice(2, {
+            title: '위례 A1-1BL 공공분양주택 분양공고',
+            targetTags: ['분양'],
+            postedAt: '2026-05-12',
+        });
+        const shopNotice = makeNotice(3, {
+            source: 'gh',
+            title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고',
+            targetTags: ['상가임대'],
+            postedAt: '2026-05-11',
+        });
+        [rentalNotice, saleNotice, shopNotice].forEach((notice) => repository.upsertNotice(notice));
+        const withoutSale = runQueryText({ repository, input: '분양 빼고 보여줘' });
+        const withoutShop = runQueryText({ repository, input: '상가 제외하고 보여줘' });
+        expect(withoutSale.text).toContain('매입임대주택');
+        expect(withoutSale.text).toContain('임대상가');
+        expect(withoutSale.text).not.toContain('공공분양주택');
+        expect(withoutShop.text).toContain('매입임대주택');
+        expect(withoutShop.text).toContain('공공분양주택');
+        expect(withoutShop.text).not.toContain('임대상가');
+    });
     it('returns a readable empty message when list filters match nothing', () => {
         const repository = createRepository(':memory:');
         const result = runQuery({

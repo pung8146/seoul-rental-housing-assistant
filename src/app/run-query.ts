@@ -3,7 +3,7 @@ import { parseCommand } from '../commands/parse.js';
 import type { ParsedCommand } from '../commands/parse.js';
 import { isActionableNotice } from '../domain/actionable.js';
 import { assessEligibility, type EligibilityAssessment } from '../domain/eligibility.js';
-import { hasNoticeType } from '../domain/notice-type.js';
+import { detectNoticeTypes, hasNoticeType } from '../domain/notice-type.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 import type { Notice, PersonalProfile, QueryFilters } from '../types.js';
 
@@ -73,6 +73,15 @@ const matchesApplicationState = (notice: Notice, state: QueryFilters['applicatio
   return !isClosedNotice(notice);
 };
 
+const matchesExcludedNoticeTypes = (notice: Notice, excludedTypes: QueryFilters['excludedNoticeTypes']): boolean => {
+  if (!excludedTypes || excludedTypes.length === 0) {
+    return true;
+  }
+
+  const labels = detectNoticeTypes(notice);
+  return excludedTypes.every((type) => !labels.includes(type));
+};
+
 type NoticeWithEligibility = {
   notice: Notice;
   eligibility: EligibilityAssessment;
@@ -133,6 +142,7 @@ export const runQuery = ({ repository, command, previousNotices }: RunQueryInput
       repository
         .queryNotices(command.filters)
         .filter((notice) => hasNoticeType(notice, command.filters.noticeTypes ?? []))
+        .filter((notice) => matchesExcludedNoticeTypes(notice, command.filters.excludedNoticeTypes))
         .filter((notice) => matchesApplicationState(notice, command.filters.applicationState))
         .filter(isActionableNotice)
         .map((notice) => withEligibility(profile, notice)),

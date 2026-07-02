@@ -73,6 +73,7 @@ export const QueryFiltersSchema = z.object({
   status: z.string().min(1).nullable().optional(),
   targetTags: z.array(z.string()).optional(),
   noticeTypes: z.array(z.enum(['분양', '임대', '상가', '신혼부부', '청년'])).optional(),
+  excludedNoticeTypes: z.array(z.enum(['분양', '임대', '상가'])).optional(),
   applicationState: z.enum(['open', 'notClosed']).optional(),
   postedAfter: z.string().min(1).nullable().optional(),
   postedBefore: z.string().min(1).nullable().optional(),
@@ -83,4 +84,7 @@ export type Listing = z.infer<typeof ListingSchema>;
 export type SourceRun = z.infer<typeof SourceRunSchema>;
 export type PersonalProfile = z.infer<typeof PersonalProfileSchema>;
 export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
-export type QueryFilters = Omit<z.infer<typeof QueryFiltersSchema>, 'noticeTypes'> & { noticeTypes?: NoticeTypeLabel[] };
+export type QueryFilters = Omit<z.infer<typeof QueryFiltersSchema>, 'noticeTypes' | 'excludedNoticeTypes'> & {
+  noticeTypes?: NoticeTypeLabel[];
+  excludedNoticeTypes?: Extract<NoticeTypeLabel, '분양' | '임대' | '상가'>[];
+};

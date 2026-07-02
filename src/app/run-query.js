@@ -2,7 +2,7 @@ import { createRepository } from '../db/repository.js';
 import { parseCommand } from '../commands/parse.js';
 import { isActionableNotice } from '../domain/actionable.js';
 import { assessEligibility } from '../domain/eligibility.js';
-import { hasNoticeType } from '../domain/notice-type.js';
+import { detectNoticeTypes, hasNoticeType } from '../domain/notice-type.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 const MAX_SUMMARY_COUNT = 5;
 const getKoreaToday = () => {
@@ -42,6 +42,13 @@ const matchesApplicationState = (notice, state) => {
         return isOpenNotice(notice);
     }
     return !isClosedNotice(notice);
+};
+const matchesExcludedNoticeTypes = (notice, excludedTypes) => {
+    if (!excludedTypes || excludedTypes.length === 0) {
+        return true;
+    }
+    const labels = detectNoticeTypes(notice);
+    return excludedTypes.every((type) => !labels.includes(type));
 };
 const eligibilityPriority = {
     likely: 0,
@@ -84,6 +91,7 @@ export const runQuery = ({ repository, command, previousNotices }) => {
         const noticeItems = safestFirst(repository
             .queryNotices(command.filters)
             .filter((notice) => hasNoticeType(notice, command.filters.noticeTypes ?? []))
+            .filter((notice) => matchesExcludedNoticeTypes(notice, command.filters.excludedNoticeTypes))
             .filter((notice) => matchesApplicationState(notice, command.filters.applicationState))
             .filter(isActionableNotice)
             .map((notice) => withEligibility(profile, notice))).slice(0, MAX_SUMMARY_COUNT);
