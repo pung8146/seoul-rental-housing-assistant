@@ -5,6 +5,44 @@ import { assessEligibility } from '../domain/eligibility.js';
 import { hasNoticeType } from '../domain/notice-type.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 const MAX_SUMMARY_COUNT = 5;
+const getKoreaToday = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        day: '2-digit',
+        month: '2-digit',
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+    }).formatToParts(new Date());
+    const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+    return `${year}-${month}-${day}`;
+};
+const isClosedNotice = (notice) => {
+    if (notice.status && /(마감|종료|접수완료)/.test(notice.status)) {
+        return true;
+    }
+    const today = getKoreaToday();
+    return Boolean(notice.applicationEndAt && notice.applicationEndAt < today);
+};
+const isOpenNotice = (notice) => {
+    if (isClosedNotice(notice)) {
+        return false;
+    }
+    const today = getKoreaToday();
+    return Boolean(notice.applicationStartAt &&
+        notice.applicationStartAt <= today &&
+        notice.applicationEndAt &&
+        notice.applicationEndAt >= today);
+};
+const matchesApplicationState = (notice, state) => {
+    if (!state) {
+        return true;
+    }
+    if (state === 'open') {
+        return isOpenNotice(notice);
+    }
+    return !isClosedNotice(notice);
+};
 const eligibilityPriority = {
     likely: 0,
     review: 1,
@@ -46,6 +84,7 @@ export const runQuery = ({ repository, command, previousNotices }) => {
         const noticeItems = safestFirst(repository
             .queryNotices(command.filters)
             .filter((notice) => hasNoticeType(notice, command.filters.noticeTypes ?? []))
+            .filter((notice) => matchesApplicationState(notice, command.filters.applicationState))
             .filter(isActionableNotice)
             .map((notice) => withEligibility(profile, notice))).slice(0, MAX_SUMMARY_COUNT);
         const notices = noticeItems.map((item) => item.notice);

@@ -179,6 +179,60 @@ describe('runQuery', () => {
         expect(result.text).toContain('[상가] GH 복합시설관 일반형 임대상가 임차인 모집공고');
         expect(result.text).not.toContain('매입임대주택');
     });
+    it('returns only currently open notices when filtering by 신청가능', () => {
+        const repository = createRepository(':memory:');
+        const openNotice = makeNotice(1, {
+            title: '서울 청년 신청가능 임대주택 입주자 모집공고',
+            applicationStartAt: '2000-01-01',
+            applicationEndAt: '2099-12-31',
+            postedAt: '2026-05-12',
+        });
+        const upcomingNotice = makeNotice(2, {
+            title: '서울 청년 접수예정 임대주택 입주자 모집공고',
+            applicationStartAt: '2099-01-01',
+            applicationEndAt: '2099-12-31',
+            postedAt: '2026-05-11',
+        });
+        const closedNotice = makeNotice(3, {
+            title: '서울 청년 마감 임대주택 입주자 모집공고',
+            applicationStartAt: '2000-01-01',
+            applicationEndAt: '2000-12-31',
+            postedAt: '2026-05-10',
+        });
+        [openNotice, upcomingNotice, closedNotice].forEach((notice) => repository.upsertNotice(notice));
+        const result = runQueryText({ repository, input: '신청가능한 공고만 보여줘' });
+        expect(result.lines).toHaveLength(1);
+        expect(result.text).toContain('신청가능 임대주택');
+        expect(result.text).not.toContain('접수예정 임대주택');
+        expect(result.text).not.toContain('마감 임대주택');
+    });
+    it('excludes closed notices when filtering by 마감 제외', () => {
+        const repository = createRepository(':memory:');
+        const openNotice = makeNotice(1, {
+            title: '서울 청년 신청가능 임대주택 입주자 모집공고',
+            applicationStartAt: '2000-01-01',
+            applicationEndAt: '2099-12-31',
+            postedAt: '2026-05-12',
+        });
+        const upcomingNotice = makeNotice(2, {
+            title: '서울 청년 접수예정 임대주택 입주자 모집공고',
+            applicationStartAt: '2099-01-01',
+            applicationEndAt: '2099-12-31',
+            postedAt: '2026-05-11',
+        });
+        const closedNotice = makeNotice(3, {
+            title: '서울 청년 마감 임대주택 입주자 모집공고',
+            applicationStartAt: '2000-01-01',
+            applicationEndAt: '2000-12-31',
+            postedAt: '2026-05-10',
+        });
+        [openNotice, upcomingNotice, closedNotice].forEach((notice) => repository.upsertNotice(notice));
+        const result = runQueryText({ repository, input: '마감 제외하고 보여줘' });
+        expect(result.lines).toHaveLength(2);
+        expect(result.text).toContain('신청가능 임대주택');
+        expect(result.text).toContain('접수예정 임대주택');
+        expect(result.text).not.toContain('마감 임대주택');
+    });
     it('returns a readable empty message when list filters match nothing', () => {
         const repository = createRepository(':memory:');
         const result = runQuery({

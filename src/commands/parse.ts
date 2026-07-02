@@ -87,6 +87,11 @@ const parseNaturalFilters = (input: string): QueryFilters => {
   if (regionMatch) {
     filters.region = normalizeRegion(regionMatch[1]);
   }
+  if (/신청가능|접수중|지원가능/.test(input)) {
+    filters.applicationState = 'open';
+  } else if (/마감\s*(제외|빼고|아닌|안된)|마감공고\s*(제외|빼고)/.test(input)) {
+    filters.applicationState = 'notClosed';
+  }
   if (/상가|상가임대|임대상가/.test(input)) {
     addNoticeType(filters, '상가');
   } else if (/분양|공공분양|분양주택|사전청약/.test(input)) {
