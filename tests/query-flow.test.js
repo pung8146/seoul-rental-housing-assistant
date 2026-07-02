@@ -135,6 +135,50 @@ describe('runQuery', () => {
         expect(result.text).toContain('공공분양주택 분양공고');
         expect(result.text).not.toContain('매입임대주택');
     });
+    it('returns only rental notices when filtering by 임대 notice type', () => {
+        const repository = createRepository(':memory:');
+        const rentalNotice = makeNotice(1, {
+            title: '서울 청년 매입임대주택 입주자 모집공고',
+            targetTags: ['청년', '매입임대'],
+            postedAt: '2026-05-11',
+        });
+        const saleNotice = makeNotice(2, {
+            title: '위례 A1-1BL 공공분양주택 분양공고',
+            targetTags: ['분양'],
+            postedAt: '2026-05-10',
+        });
+        const shopNotice = makeNotice(3, {
+            source: 'gh',
+            title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고',
+            targetTags: ['상가임대'],
+            postedAt: '2026-05-09',
+        });
+        [rentalNotice, saleNotice, shopNotice].forEach((notice) => repository.upsertNotice(notice));
+        const result = runQueryText({ repository, input: '임대 공고 보여줘' });
+        expect(result.lines).toHaveLength(1);
+        expect(result.text).toContain('[임대] 서울 청년 매입임대주택 입주자 모집공고');
+        expect(result.text).not.toContain('공공분양주택');
+        expect(result.text).not.toContain('임대상가');
+    });
+    it('returns only shop notices when filtering by 상가 notice type', () => {
+        const repository = createRepository(':memory:');
+        const rentalNotice = makeNotice(1, {
+            title: '서울 청년 매입임대주택 입주자 모집공고',
+            targetTags: ['청년', '매입임대'],
+            postedAt: '2026-05-11',
+        });
+        const shopNotice = makeNotice(2, {
+            source: 'gh',
+            title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고',
+            targetTags: ['상가임대'],
+            postedAt: '2026-05-10',
+        });
+        [rentalNotice, shopNotice].forEach((notice) => repository.upsertNotice(notice));
+        const result = runQueryText({ repository, input: '상가 공고 보여줘' });
+        expect(result.lines).toHaveLength(1);
+        expect(result.text).toContain('[상가] GH 복합시설관 일반형 임대상가 임차인 모집공고');
+        expect(result.text).not.toContain('매입임대주택');
+    });
     it('returns a readable empty message when list filters match nothing', () => {
         const repository = createRepository(':memory:');
         const result = runQuery({

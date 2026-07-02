@@ -2,6 +2,7 @@ import { createRepository } from '../db/repository.js';
 import { parseCommand } from '../commands/parse.js';
 import { isActionableNotice } from '../domain/actionable.js';
 import { assessEligibility } from '../domain/eligibility.js';
+import { hasNoticeType } from '../domain/notice-type.js';
 import { formatNoticeDetails, formatNoticeSummaryLine } from '../notifier/formatter.js';
 const MAX_SUMMARY_COUNT = 5;
 const eligibilityPriority = {
@@ -42,7 +43,11 @@ const formatEligibilityHeader = (items) => {
 export const runQuery = ({ repository, command, previousNotices }) => {
     if (command.intent === 'list') {
         const profile = repository.getPersonalProfile();
-        const noticeItems = safestFirst(repository.queryNotices(command.filters).filter(isActionableNotice).map((notice) => withEligibility(profile, notice))).slice(0, MAX_SUMMARY_COUNT);
+        const noticeItems = safestFirst(repository
+            .queryNotices(command.filters)
+            .filter((notice) => hasNoticeType(notice, command.filters.noticeTypes ?? []))
+            .filter(isActionableNotice)
+            .map((notice) => withEligibility(profile, notice))).slice(0, MAX_SUMMARY_COUNT);
         const notices = noticeItems.map((item) => item.notice);
         const lines = noticeItems.map((item, index) => formatNoticeSummaryLine(item.notice, index + 1, item.eligibility));
         if (lines.length === 0) {

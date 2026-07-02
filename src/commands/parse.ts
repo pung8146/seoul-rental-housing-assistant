@@ -40,6 +40,10 @@ const addTargetTag = (filters: QueryFilters, tag: string): void => {
   filters.targetTags = Array.from(new Set([...(filters.targetTags ?? []), tag]));
 };
 
+const addNoticeType = (filters: QueryFilters, type: NonNullable<QueryFilters['noticeTypes']>[number]): void => {
+  filters.noticeTypes = Array.from(new Set([...(filters.noticeTypes ?? []), type]));
+};
+
 const parseStructuredFilters = (input: string): QueryFilters => {
   const filters: QueryFilters = {};
   const segments = input
@@ -62,7 +66,13 @@ const parseStructuredFilters = (input: string): QueryFilters => {
       filters.status = value;
     } else if (key === '기관') {
       filters.source = normalizeSource(value);
-    } else if (key === '유형' || key === '대상') {
+    } else if (key === '유형') {
+      if (value === '임대' || value === '분양' || value === '상가') {
+        addNoticeType(filters, value);
+      } else {
+        addTargetTag(filters, value);
+      }
+    } else if (key === '대상') {
       addTargetTag(filters, value);
     }
   }
@@ -77,8 +87,13 @@ const parseNaturalFilters = (input: string): QueryFilters => {
   if (regionMatch) {
     filters.region = normalizeRegion(regionMatch[1]);
   }
-  if (/분양|공공분양|분양주택|사전청약/.test(input)) {
+  if (/상가|상가임대|임대상가/.test(input)) {
+    addNoticeType(filters, '상가');
+  } else if (/분양|공공분양|분양주택|사전청약/.test(input)) {
+    addNoticeType(filters, '분양');
     addTargetTag(filters, '분양');
+  } else if (/임대/.test(input)) {
+    addNoticeType(filters, '임대');
   }
   if (/신혼|신혼부부/.test(input)) {
     addTargetTag(filters, '신혼부부');

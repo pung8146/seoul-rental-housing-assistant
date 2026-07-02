@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDailySummary, formatNoticeDetails } from '../src/notifier/formatter.js';
+import { formatDailySummary, formatNoticeDetails, formatNoticeSummaryLine } from '../src/notifier/formatter.js';
 const makeNotice = (overrides = {}) => ({
     source: 'lh',
     sourceId: 'notice-1',
@@ -58,6 +58,22 @@ describe('formatDailySummary', () => {
         expect(summary).toContain('매물 1건');
         expect(summary).toContain('https://example.com/notices/1');
     });
+    it('adds notice type labels to Telegram summaries', () => {
+        const line = formatNoticeSummaryLine(makeNotice({
+            title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고',
+            targetTags: ['상가임대'],
+        }), 1);
+        const summary = formatDailySummary([
+            makeEvent({
+                notice: makeNotice({
+                    title: '위례 A1-1BL 공공분양주택 분양공고',
+                    targetTags: ['분양'],
+                }),
+            }),
+        ]);
+        expect(line).toContain('1. [상가] GH 복합시설관 일반형 임대상가 임차인 모집공고');
+        expect(summary).toContain('신규 · [분양] 위례 A1-1BL 공공분양주택 분양공고');
+    });
     it('includes changed fields for listing_changed events', () => {
         const summary = formatDailySummary([
             makeEvent({
@@ -97,7 +113,7 @@ describe('formatDailySummary', () => {
                 }),
             }),
         ]);
-        expect(summary.match(/변경 · 서울 청년 임대주택 모집/g)).toHaveLength(1);
+        expect(summary.match(/변경 · \[임대\] 서울 청년 임대주택 모집/g)).toHaveLength(1);
         expect(summary).toContain('매물 2건');
         expect(summary).toContain('월세: 250,000원 → 270,000원');
     });

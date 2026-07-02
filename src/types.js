@@ -64,6 +64,7 @@ export const QueryFiltersSchema = z.object({
     region: z.string().min(1).nullable().optional(),
     status: z.string().min(1).nullable().optional(),
     targetTags: z.array(z.string()).optional(),
+    noticeTypes: z.array(z.enum(['분양', '임대', '상가', '신혼부부', '청년'])).optional(),
     postedAfter: z.string().min(1).nullable().optional(),
     postedBefore: z.string().min(1).nullable().optional(),
 });

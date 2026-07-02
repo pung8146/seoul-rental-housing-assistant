@@ -24,6 +24,7 @@ describe('parseCommand', () => {
             filters: {
                 region: '서울',
                 targetTags: ['분양'],
+                noticeTypes: ['분양'],
             },
         });
         expect(parseCommand('신혼부부 공고 보여줘')).toEqual({
@@ -40,7 +41,7 @@ describe('parseCommand', () => {
                 region: '경기',
                 status: '모집중',
                 source: 'sh',
-                targetTags: ['분양'],
+                noticeTypes: ['분양'],
             },
         });
     });

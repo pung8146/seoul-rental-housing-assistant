@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { NoticeTypeLabel } from './domain/notice-type.js';
 
 const NullableString = z.string().min(1).nullable();
 const NullableNumber = z.number().finite().nullable();
@@ -71,6 +72,7 @@ export const QueryFiltersSchema = z.object({
   region: z.string().min(1).nullable().optional(),
   status: z.string().min(1).nullable().optional(),
   targetTags: z.array(z.string()).optional(),
+  noticeTypes: z.array(z.enum(['분양', '임대', '상가', '신혼부부', '청년'])).optional(),
   postedAfter: z.string().min(1).nullable().optional(),
   postedBefore: z.string().min(1).nullable().optional(),
 });
@@ -80,4 +82,4 @@ export type Listing = z.infer<typeof ListingSchema>;
 export type SourceRun = z.infer<typeof SourceRunSchema>;
 export type PersonalProfile = z.infer<typeof PersonalProfileSchema>;
 export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
-export type QueryFilters = z.infer<typeof QueryFiltersSchema>;
+export type QueryFilters = Omit<z.infer<typeof QueryFiltersSchema>, 'noticeTypes'> & { noticeTypes?: NoticeTypeLabel[] };

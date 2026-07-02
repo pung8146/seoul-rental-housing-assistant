@@ -1,11 +1,14 @@
 import { getPrimaryApplicationAttachment } from '../domain/attachments.js';
+import { formatNoticeCategoryLabel } from '../domain/notice-type.js';
 export const formatNoticeSummaryLine = (notice, index, eligibility) => {
     const details = [notice.region, getApplicationStatus(notice), notice.postedAt ? `게시 ${notice.postedAt}` : null]
         .filter((value) => Boolean(value))
         .join(' · ');
-    const prefix = eligibility ? `[${eligibility.label}] ` : '';
+    const eligibilityPrefix = eligibility ? `[${eligibility.label}] ` : '';
+    const typeLabel = formatNoticeCategoryLabel(notice);
+    const typePrefix = typeLabel ? `[${typeLabel}] ` : '';
     const reasons = eligibility?.reasons.length ? ` - ${eligibility.reasons.join(', ')}` : '';
-    return `${index}. ${prefix}${notice.title}${details ? ` (${details})` : ''}${reasons}`;
+    return `${index}. ${eligibilityPrefix}${typePrefix}${notice.title}${details ? ` (${details})` : ''}${reasons}`;
 };
 const formatCurrency = (value) => {
     if (value === null) {
@@ -129,7 +132,9 @@ const summarizeEventGroup = (events) => {
     const eventLabel = hasNewNotice ? '신규' : hasChangedListing ? '변경' : '추가';
     const listingCount = events.filter((event) => event.listing).length;
     const countLabel = hasNewNotice ? '매물 1건' : listingCount > 0 ? `매물 ${listingCount}건` : null;
-    const header = [eventLabel, firstEvent.notice.title].join(' · ');
+    const typeLabel = formatNoticeCategoryLabel(firstEvent.notice);
+    const title = typeLabel ? `[${typeLabel}] ${firstEvent.notice.title}` : firstEvent.notice.title;
+    const header = [eventLabel, title].join(' · ');
     const body = [formatNoticeMeta(firstEvent.notice), countLabel, firstEvent.notice.sourceUrl]
         .filter((value) => Boolean(value))
         .join('\n');
