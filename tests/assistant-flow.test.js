@@ -137,6 +137,36 @@ describe('runAssistantText', () => {
         expect(detailResult.text).toContain('서울 1번 상세');
         expect(detailResult.text).not.toContain('경기 상세');
     });
+    it('answers operation status questions from source runs and notification history', async () => {
+        const repository = createRepository(':memory:');
+        repository.recordSourceRun({
+            source: 'lh',
+            startedAt: '2026-07-02T00:00:00.000Z',
+            finishedAt: '2026-07-02T00:00:10.000Z',
+            status: 'success',
+            message: null,
+        });
+        repository.recordSourceRun({
+            source: 'gh',
+            startedAt: '2026-07-02T00:00:00.000Z',
+            finishedAt: '2026-07-02T00:00:15.000Z',
+            status: 'failure',
+            message: 'timeout',
+        });
+        repository.recordNotification('telegram:chat', 'payload-hash', '2026-07-02T00:01:00.000Z');
+        const result = await runAssistantText({
+            repository,
+            adapters: [],
+            input: '수집상태 알려줘',
+        });
+        expect(result.mode).toBe('status');
+        expect(result.text).toContain('수집 상태');
+        expect(result.text).toContain('마지막 수집: 2026-07-02T00:00:15.000Z');
+        expect(result.text).toContain('성공 1개');
+        expect(result.text).toContain('실패 1개');
+        expect(result.text).toContain('gh: 실패 - timeout');
+        expect(result.text).toContain('마지막 텔레그램 알림: 2026-07-02T00:01:00.000Z');
+    });
     it('persists the shown list so separate answer invocations can use it', () => {
         const directory = mkdtempSync(join(tmpdir(), 'rental-housing-context-'));
         const contextPath = join(directory, 'context.json');
