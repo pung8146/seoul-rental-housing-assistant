@@ -171,6 +171,28 @@ describe('public feed export', () => {
     ]);
   });
 
+
+  it('classifies housing 모집공고 titles without explicit 임대 keyword as rent', () => {
+    expect(
+      detectPublicNoticeTypes({
+        title: '2026-2차 사당동원룸 잔여세대 입주자모집공고(26. 6. 26.)',
+        targetTags: [],
+      }),
+    ).toEqual(['임대']);
+    expect(
+      detectPublicNoticeTypes({
+        title: '[토지지원 사회주택] 유니버설디자인하우스 창동 입주자 모집공고',
+        targetTags: [],
+      }),
+    ).toEqual(['임대']);
+    expect(
+      detectPublicNoticeTypes({
+        title: '경기남부권(군포시) 공가세대 일반매각 공고(무순위)',
+        targetTags: [],
+      }),
+    ).toEqual(['분양']);
+  });
+
   it('classifies rental shop notices as shop, not rent', () => {
     expect(detectPublicNoticeTypes({ title: 'GH 복합시설관 일반형 임대상가 임차인 모집공고', targetTags: ['상가임대'] })).toEqual([
       '상가',

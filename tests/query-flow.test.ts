@@ -61,8 +61,8 @@ describe('runQuery', () => {
     });
 
     expect(result.lines).toHaveLength(5);
-    expect(result.lines[0]).toContain('1. [프로필 필요] 공고 6 입주자 모집공고');
-    expect(result.lines[4]).toContain('5. [프로필 필요] 공고 2 입주자 모집공고');
+    expect(result.lines[0]).toContain('1. [프로필 필요] [임대] 공고 6 입주자 모집공고');
+    expect(result.lines[4]).toContain('5. [프로필 필요] [임대] 공고 2 입주자 모집공고');
     expect(result.text).not.toContain('공고 1');
   });
 
@@ -372,8 +372,8 @@ describe('runQuery', () => {
 
     expect(result.text).toContain('신청 가능성 높은 공고 1건');
     expect(result.text).toContain('확인 필요 1건');
-    expect(result.lines[0]).toContain('1. [지원가능성 높음] 서울 청년 조건 확인 입주자 모집공고');
-    expect(result.lines[1]).toContain('2. [조건 확인 필요] 서울 청년 조건 미확인 입주자 모집공고');
+    expect(result.lines[0]).toContain('1. [지원가능성 높음] [임대] 서울 청년 조건 확인 입주자 모집공고');
+    expect(result.lines[1]).toContain('2. [조건 확인 필요] [임대] 서울 청년 조건 미확인 입주자 모집공고');
     expect(result.lines[1]).toContain('공고문에서 신청 조건을 찾지 못함');
   });
 
@@ -436,8 +436,8 @@ describe('runQuery', () => {
     });
 
     expect(listResult.lines).toEqual([
-      expect.stringContaining('1. [프로필 필요] 공고 3 입주자 모집공고'),
-      expect.stringContaining('2. [프로필 필요] 공고 1 입주자 모집공고'),
+      expect.stringContaining('1. [프로필 필요] [임대] 공고 3 입주자 모집공고'),
+      expect.stringContaining('2. [프로필 필요] [임대] 공고 1 입주자 모집공고'),
     ]);
     expect(detailResult.text).toContain('공고 1 입주자 모집공고');
     expect(detailResult.text).toContain('서울 상세 매물');
