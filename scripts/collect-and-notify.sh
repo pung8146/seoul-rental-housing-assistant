@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/home/pung8146/.openclaw/workspace/apps/rental-housing-assistant"
-STATE_DIR="${OPENCLAW_STATE_DIR:-/home/pung8146/.openclaw}/rental-housing-assistant"
-NODE_BIN="/home/pung8146/.nvm/versions/node/v24.15.0/bin"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="${RENTAL_HOUSING_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+STATE_DIR="${RENTAL_HOUSING_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/housing}"
+ENV_FILE="${RENTAL_HOUSING_ENV_FILE:-$STATE_DIR/collector.env}"
+LOG_DIR="$STATE_DIR/logs"
 LOCK_DIR="$STATE_DIR/collect.lock"
-LOG_FILE="$STATE_DIR/collect-notify.log"
+LOG_FILE="$LOG_DIR/collect-notify.log"
 
-mkdir -p "$STATE_DIR"
+mkdir -p "$LOG_DIR"
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   printf '[%s] previous collect still running\n' "$(date -Is)" >> "$LOG_FILE"
@@ -19,21 +21,49 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cd "$APP_DIR"
-
-export PATH="$NODE_BIN:/usr/local/bin:/usr/bin:/bin"
-export RENTAL_HOUSING_DB_PATH="${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}"
-export RENTAL_HOUSING_CONTEXT_PATH="${RENTAL_HOUSING_CONTEXT_PATH:-$STATE_DIR/telegram-context.json}"
-
-if [ -f "$STATE_DIR/collect-notify.env" ]; then
+if [ -f "$ENV_FILE" ]; then
   set -a
   # shellcheck disable=SC1091
-  . "$STATE_DIR/collect-notify.env"
+  . "$ENV_FILE"
   set +a
 fi
 
+export RENTAL_HOUSING_STATE_DIR="$STATE_DIR"
+export RENTAL_HOUSING_DB_PATH="${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}"
+export RENTAL_HOUSING_CONTEXT_PATH="${RENTAL_HOUSING_CONTEXT_PATH:-$STATE_DIR/telegram-context.json}"
+
+select_linux_node() {
+  if [ -n "${HOUSING_NODE_BIN_DIR:-}" ]; then
+    export PATH="$HOUSING_NODE_BIN_DIR:/usr/local/bin:/usr/bin:/bin"
+  fi
+
+  if command -v node >/dev/null 2>&1 \
+    && command -v npm >/dev/null 2>&1 \
+    && [ "$(node -p 'process.platform' 2>/dev/null)" = "linux" ]; then
+    return
+  fi
+
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+    printf 'Linux Node.js not found; install NVM or set HOUSING_NODE_BIN_DIR\n' >&2
+    return 1
+  fi
+
+  # shellcheck disable=SC1091
+  . "$NVM_DIR/nvm.sh"
+  nvm use --silent default >/dev/null
+
+  if [ "$(node -p 'process.platform' 2>/dev/null)" != "linux" ]; then
+    printf 'Linux Node.js is required\n' >&2
+    return 1
+  fi
+}
+
 {
   printf '\n[%s] collect notify start\n' "$(date -Is)"
+  select_linux_node
+  cd "$APP_DIR"
   npm run collect:notify -- "$@"
+  "$SCRIPT_DIR/publish-public-dashboard.sh"
   printf '[%s] collect notify done\n' "$(date -Is)"
 } >> "$LOG_FILE" 2>&1

@@ -6,3 +6,5 @@ public/
 *.sqlite
 *.db
 .env
+.env.*
+*.log
