@@ -71,8 +71,18 @@ if [ "\${1:-}" = "run" ] && [ "\${2:-}" = "collect:notify" ]; then
     "\${COLLECTOR_ENV_MARKER:-}" > "\${STUB_COLLECT_RECORD:?}"
 elif [ "\${1:-}" = "run" ] && [ "\${2:-}" = "export:public-feed" ]; then
   printf '%s\\n' "\${STUB_FEED_CONTENT:?}" > "\${PUBLIC_FEED_PATH:?}"
+  if [ "\${STUB_FAIL_STAGE:-}" = "export" ]; then
+    exit 70
+  fi
 elif [ "\${1:-}" = "--prefix" ] && [ "\${3:-}" = "run" ] && [ "\${4:-}" = "build:public-dashboard" ]; then
   test -f "\${2}/public/public-feed.json"
+  if [ "\${STUB_STAGE_UNRELATED:-}" = "yes" ]; then
+    printf 'changed by build\\n' > "\${2}/keep.txt"
+    /usr/bin/git -C "\${2}" add -- keep.txt
+  fi
+  if [ "\${STUB_FAIL_STAGE:-}" = "build" ]; then
+    exit 71
+  fi
 else
   printf 'unexpected npm command: %s\\n' "$*" >&2
   exit 64
@@ -104,6 +114,28 @@ function scriptEnvironment(fixture: Fixture, feed: string): NodeJS.ProcessEnv {
   delete environment.NVM_DIR;
 
   return environment;
+}
+
+function runPublisher(
+  fixture: Fixture,
+  feed: string,
+  overrides: NodeJS.ProcessEnv = {},
+) {
+  return spawnSync('/usr/bin/bash', [publishScript], {
+    encoding: 'utf8',
+    env: { ...scriptEnvironment(fixture, feed), ...overrides },
+  });
+}
+
+function pushRemoteCommit(fixture: Fixture, suffix: string): void {
+  const writerDirectory = join(fixture.rootDirectory, `remote-writer-${suffix}`);
+  git(fixture.rootDirectory, 'clone', '--quiet', fixture.remoteDirectory, writerDirectory);
+  git(writerDirectory, 'config', 'user.name', 'Remote Test');
+  git(writerDirectory, 'config', 'user.email', 'remote-test@example.invalid');
+  writeFileSync(join(writerDirectory, `remote-${suffix}.txt`), `remote ${suffix}\n`);
+  git(writerDirectory, 'add', '.');
+  git(writerDirectory, 'commit', '-m', `remote ${suffix}`);
+  git(writerDirectory, 'push', 'origin', 'main');
 }
 
 function useWindowsNpmShim(fixture: Fixture): void {
@@ -260,4 +292,167 @@ test('collector rejects a Windows npm shim before collection starts', () => {
   expect(existsSync(collectRecordPath)).toBe(false);
   expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
   expect(git(fixture.dashboardDirectory, 'log', '--format=%s')).toBe('initial dashboard');
+});
+
+describe('publisher repository safety', () => {
+  test.each(['feature', 'detached'] as const)('refuses a %s checkout before mutation', (checkoutState) => {
+    const fixture = createFixture();
+    const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+    const feedBefore = readFileSync(feedPath, 'utf8');
+    if (checkoutState === 'feature') {
+      git(fixture.dashboardDirectory, 'checkout', '-b', 'feature');
+    } else {
+      git(fixture.dashboardDirectory, 'checkout', '--detach');
+    }
+    const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+
+    const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('main');
+    expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(headBefore);
+    expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+  });
+
+  test('refuses non-automation commits ahead of origin main', () => {
+    const fixture = createFixture();
+    const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+    const feedBefore = readFileSync(feedPath, 'utf8');
+    const remoteBefore = git(fixture.remoteDirectory, 'rev-parse', 'main');
+    writeFileSync(join(fixture.dashboardDirectory, 'manual-refinement.txt'), 'manual\n');
+    git(fixture.dashboardDirectory, 'add', 'manual-refinement.txt');
+    git(fixture.dashboardDirectory, 'commit', '-m', 'fix: manual dashboard refinement');
+    const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+
+    const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('non-automation');
+    expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(headBefore);
+    expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
+    expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+  });
+
+  test('retries an unpushed automation-only feed commit before unchanged export', () => {
+    const fixture = createFixture();
+    const feed = '{"notices":[{"id":"pending"}]}\n';
+    const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+    writeFileSync(feedPath, feed);
+    git(fixture.dashboardDirectory, 'add', 'public/public-feed.json');
+    git(fixture.dashboardDirectory, 'commit', '-m', 'data: update public housing notices');
+    const pendingHead = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+
+    const result = runPublisher(fixture, feed);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(pendingHead);
+    expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(pendingHead);
+  });
+
+  test.each(['behind', 'diverged'] as const)(
+    'refuses a %s main before mutating the feed',
+    (repositoryState) => {
+      const fixture = createFixture();
+      const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+      const feedBefore = readFileSync(feedPath, 'utf8');
+      if (repositoryState === 'diverged') {
+        writeFileSync(join(fixture.dashboardDirectory, 'local-only.txt'), 'local\n');
+        git(fixture.dashboardDirectory, 'add', 'local-only.txt');
+        git(fixture.dashboardDirectory, 'commit', '-m', 'local divergence');
+      }
+      const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+      pushRemoteCommit(fixture, repositoryState);
+
+      const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(repositoryState);
+      expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(headBefore);
+      expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+      expect(git(fixture.dashboardDirectory, 'status', '--porcelain')).toBe('');
+    },
+  );
+
+  test.each(['export', 'build', 'commit'] as const)(
+    'restores the feed and index after %s failure',
+    (failureStage) => {
+      const fixture = createFixture();
+      const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+      const feedBefore = readFileSync(feedPath, 'utf8');
+      const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+      const hookPath = join(fixture.dashboardDirectory, '.git', 'hooks', 'pre-commit');
+      const overrides: NodeJS.ProcessEnv = {};
+      if (failureStage === 'commit') {
+        writeFileSync(hookPath, '#!/usr/bin/env bash\nexit 72\n');
+        chmodSync(hookPath, 0o755);
+      } else {
+        overrides.STUB_FAIL_STAGE = failureStage;
+      }
+
+      const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n', overrides);
+
+      expect(result.status).not.toBe(0);
+      expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+      expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(headBefore);
+      expect(git(fixture.dashboardDirectory, 'status', '--porcelain')).toBe('');
+
+      rmSync(hookPath, { force: true });
+      const retry = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+      expect(retry.status, retry.stderr).toBe(0);
+    },
+  );
+
+  test('rejects a tracked symlink feed without changing its target', () => {
+    const fixture = createFixture();
+    const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+    const outsidePath = join(fixture.rootDirectory, 'outside-feed.json');
+    const outsideBefore = '{"outside":true}\n';
+    writeFileSync(outsidePath, outsideBefore);
+    rmSync(feedPath);
+    symlinkSync(outsidePath, feedPath);
+    git(fixture.dashboardDirectory, 'add', 'public/public-feed.json');
+    git(fixture.dashboardDirectory, 'commit', '-m', 'test symlink feed');
+    git(fixture.dashboardDirectory, 'push', 'origin', 'main');
+    const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+
+    const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('regular');
+    expect(readFileSync(outsidePath, 'utf8')).toBe(outsideBefore);
+    expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(headBefore);
+  });
+
+  test('never commits an unrelated file staged during the dashboard build', () => {
+    const fixture = createFixture();
+    const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+    const feedBefore = readFileSync(feedPath, 'utf8');
+    const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+    const remoteBefore = git(fixture.remoteDirectory, 'rev-parse', 'main');
+
+    const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n', {
+      STUB_STAGE_UNRELATED: 'yes',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(headBefore);
+    expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
+    expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+    expect(git(fixture.dashboardDirectory, 'diff', '--cached', '--name-only')).toBe('keep.txt');
+  });
+
+  test('refuses a concurrent publisher lock scoped to the dashboard', () => {
+    const fixture = createFixture();
+    const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+    const feedBefore = readFileSync(feedPath, 'utf8');
+    const gitDirectory = git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir');
+    mkdirSync(join(gitDirectory, 'housing-publish.lock'));
+
+    const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('already running');
+    expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+    expect(git(fixture.dashboardDirectory, 'log', '--format=%s')).toBe('initial dashboard');
+  });
 });
