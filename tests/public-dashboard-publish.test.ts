@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -89,7 +90,7 @@ function scriptEnvironment(fixture: Fixture, feed: string): NodeJS.ProcessEnv {
   mkdirSync(homeDirectory, { recursive: true });
   writeFileSync(databasePath, 'test database\n');
 
-  return {
+  const environment: NodeJS.ProcessEnv = {
     ...process.env,
     HOME: homeDirectory,
     HOUSING_DASHBOARD_DIR: fixture.dashboardDirectory,
@@ -100,6 +101,9 @@ function scriptEnvironment(fixture: Fixture, feed: string): NodeJS.ProcessEnv {
     STUB_FEED_CONTENT: feed.trim(),
     'BASH_FUNC_npm%%': `() { /usr/bin/bash '${join(fixture.stubBinDirectory, 'npm')}' "$@"; }`,
   };
+  delete environment.NVM_DIR;
+
+  return environment;
 }
 
 function useWindowsNpmShim(fixture: Fixture): void {
@@ -224,4 +228,36 @@ test('collector uses the XDG housing runtime and then publishes', () => {
     'collect notify done',
   );
   expect(readFileSync(collectScript, 'utf8')).not.toContain('/home/pung8146/.openclaw');
+});
+
+test('collector rejects a Windows npm shim before collection starts', () => {
+  const fixture = createFixture();
+  const xdgDataHome = join(fixture.rootDirectory, 'xdg-data');
+  const runtimeDirectory = join(xdgDataHome, 'housing');
+  const collectRecordPath = join(fixture.rootDirectory, 'collect-record.txt');
+  const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+  const feedBefore = readFileSync(feedPath, 'utf8');
+  mkdirSync(runtimeDirectory, { recursive: true });
+  writeFileSync(join(runtimeDirectory, 'rental-housing.db'), 'test database\n');
+  useWindowsNpmShim(fixture);
+  const environment: NodeJS.ProcessEnv = {
+    ...scriptEnvironment(fixture, '{"notices":[{"id":"should-not-run"}]}\n'),
+    STUB_COLLECT_RECORD: collectRecordPath,
+    XDG_DATA_HOME: xdgDataHome,
+  };
+  delete environment.RENTAL_HOUSING_DB_PATH;
+
+  const result = spawnSync('/usr/bin/bash', [collectScript], {
+    cwd: fixture.rootDirectory,
+    encoding: 'utf8',
+    env: environment,
+  });
+
+  expect(result.status).not.toBe(0);
+  expect(readFileSync(join(runtimeDirectory, 'logs', 'collect-notify.log'), 'utf8')).toContain(
+    'Linux npm',
+  );
+  expect(existsSync(collectRecordPath)).toBe(false);
+  expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+  expect(git(fixture.dashboardDirectory, 'log', '--format=%s')).toBe('initial dashboard');
 });
