@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,18 +57,26 @@ fi
 }
 function scriptEnvironment(fixture, feed) {
     const homeDirectory = join(fixture.rootDirectory, 'home');
+    const databasePath = join(fixture.rootDirectory, 'rental-housing.db');
     mkdirSync(homeDirectory, { recursive: true });
+    writeFileSync(databasePath, 'test database\n');
     return {
         ...process.env,
         HOME: homeDirectory,
         HOUSING_DASHBOARD_DIR: fixture.dashboardDirectory,
         HOUSING_NODE_BIN_DIR: fixture.stubBinDirectory,
         PATH: `${fixture.stubBinDirectory}:/usr/bin:/bin`,
-        RENTAL_HOUSING_DB_PATH: join(fixture.rootDirectory, 'rental-housing.db'),
+        RENTAL_HOUSING_DB_PATH: databasePath,
         STUB_COLLECT_RECORD: join(fixture.rootDirectory, 'collect-record.txt'),
         STUB_FEED_CONTENT: feed.trim(),
         'BASH_FUNC_npm%%': `() { /usr/bin/bash '${join(fixture.stubBinDirectory, 'npm')}' "$@"; }`,
     };
+}
+function useWindowsNpmShim(fixture) {
+    const npmPath = join(fixture.stubBinDirectory, 'npm');
+    const windowsNpmPath = join(fixture.stubBinDirectory, 'npm.cmd');
+    renameSync(npmPath, windowsNpmPath);
+    symlinkSync(windowsNpmPath, npmPath);
 }
 describe('public dashboard publisher', () => {
     test('publishes a changed feed as the only dashboard file change', () => {
@@ -97,6 +105,33 @@ describe('public dashboard publisher', () => {
         expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(before);
         expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(before);
     });
+    test('rejects a missing housing database before exporting', () => {
+        const fixture = createFixture();
+        const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+        const before = readFileSync(feedPath, 'utf8');
+        const environment = scriptEnvironment(fixture, '{"notices":[{"id":"new"}]}\n');
+        rmSync(join(fixture.rootDirectory, 'rental-housing.db'));
+        const result = spawnSync('/usr/bin/bash', [publishScript], {
+            encoding: 'utf8',
+            env: environment,
+        });
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('database');
+        expect(readFileSync(feedPath, 'utf8')).toBe(before);
+    });
+    test('rejects a Windows npm shim even when node is Linux', () => {
+        const fixture = createFixture();
+        const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+        const before = readFileSync(feedPath, 'utf8');
+        useWindowsNpmShim(fixture);
+        const result = spawnSync('/usr/bin/bash', [publishScript], {
+            encoding: 'utf8',
+            env: scriptEnvironment(fixture, '{"notices":[{"id":"new"}]}\n'),
+        });
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('Linux npm');
+        expect(readFileSync(feedPath, 'utf8')).toBe(before);
+    });
     test('refuses a dirty dashboard before exporting', () => {
         const fixture = createFixture();
         const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
@@ -118,6 +153,7 @@ test('collector uses the XDG housing runtime and then publishes', () => {
     const runtimeDirectory = join(xdgDataHome, 'housing');
     const collectRecordPath = join(fixture.rootDirectory, 'collect-record.txt');
     mkdirSync(runtimeDirectory, { recursive: true });
+    writeFileSync(join(runtimeDirectory, 'rental-housing.db'), 'test database\n');
     writeFileSync(join(runtimeDirectory, 'collector.env'), 'COLLECTOR_ENV_MARKER=loaded\n');
     const environment = {
         ...scriptEnvironment(fixture, feed),
