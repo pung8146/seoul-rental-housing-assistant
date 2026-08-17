@@ -252,7 +252,9 @@ test('collector uses the XDG housing runtime and then publishes', () => {
   const collectRecordPath = join(fixture.rootDirectory, 'collect-record.txt');
   mkdirSync(runtimeDirectory, { recursive: true });
   writeFileSync(join(runtimeDirectory, 'rental-housing.db'), 'test database\n');
-  writeFileSync(join(runtimeDirectory, 'collector.env'), 'COLLECTOR_ENV_MARKER=loaded\n');
+  writeFileSync(join(runtimeDirectory, 'collector.env'), 'COLLECTOR_ENV_MARKER=loaded\n', {
+    mode: 0o600,
+  });
   const environment: NodeJS.ProcessEnv = {
     ...scriptEnvironment(fixture, feed),
     OPENCLAW_STATE_DIR: join(fixture.rootDirectory, 'legacy-state'),
