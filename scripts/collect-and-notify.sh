@@ -8,6 +8,7 @@ ENV_FILE="${RENTAL_HOUSING_ENV_FILE:-$STATE_DIR/collector.env}"
 LOG_DIR="$STATE_DIR/logs"
 LOCK_DIR="$STATE_DIR/collect.lock"
 LOG_FILE="$LOG_DIR/collect-notify.log"
+NPM_BIN=''
 
 mkdir -p "$LOG_DIR"
 
@@ -47,6 +48,7 @@ linux_node_and_npm_available() {
     /mnt/* | *.bat | *.cmd | *.exe) return 1 ;;
   esac
 
+  NPM_BIN="$npm_path"
   return 0
 }
 
@@ -79,7 +81,7 @@ select_linux_node() {
   printf '\n[%s] collect notify start\n' "$(date -Is)"
   select_linux_node
   cd "$APP_DIR"
-  npm run collect:notify -- "$@"
+  "$NPM_BIN" run collect:notify -- "$@"
   "$SCRIPT_DIR/publish-public-dashboard.sh"
   printf '[%s] collect notify done\n' "$(date -Is)"
 } >> "$LOG_FILE" 2>&1

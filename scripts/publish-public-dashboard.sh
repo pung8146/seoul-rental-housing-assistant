@@ -8,6 +8,7 @@ STATE_DIR="${RENTAL_HOUSING_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/hous
 DASHBOARD_INPUT="${HOUSING_DASHBOARD_DIR:-$HOME/projects/housing/web-dashboard}"
 FEED_RELATIVE_PATH="public/public-feed.json"
 AUTOMATION_COMMIT_SUBJECT="data: update public housing notices"
+NPM_BIN=''
 
 fail() {
   printf '%s\n' "$1" >&2
@@ -29,6 +30,7 @@ linux_node_and_npm_available() {
     /mnt/* | *.bat | *.cmd | *.exe) return 1 ;;
   esac
 
+  NPM_BIN="$npm_path"
   return 0
 }
 
@@ -171,7 +173,7 @@ cp -p -- "$FEED_PATH" "$BACKUP_FEED"
 TEMP_FEED="$(mktemp "$PUBLIC_DIR/.public-feed.json.XXXXXX")"
 
 cd "$APP_DIR"
-PUBLIC_FEED_PATH="$TEMP_FEED" npm run export:public-feed
+PUBLIC_FEED_PATH="$TEMP_FEED" "$NPM_BIN" run export:public-feed
 if [ -L "$TEMP_FEED" ] || [ ! -f "$TEMP_FEED" ]; then
   fail 'public feed exporter did not produce a regular file'
 fi
@@ -180,7 +182,7 @@ FEED_REPLACED=1
 mv -f -- "$TEMP_FEED" "$FEED_PATH"
 TEMP_FEED=''
 
-npm --prefix "$DASHBOARD_DIR" run build:public-dashboard
+"$NPM_BIN" --prefix "$DASHBOARD_DIR" run build:public-dashboard
 
 UNSTAGED_PATHS="$(git -C "$DASHBOARD_DIR" diff --name-only)"
 STAGED_PATHS="$(git -C "$DASHBOARD_DIR" diff --cached --name-only)"

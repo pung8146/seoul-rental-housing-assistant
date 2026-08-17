@@ -160,6 +160,15 @@ describe('public dashboard publisher', () => {
         expect(result.stderr).toContain('Linux npm');
         expect(readFileSync(feedPath, 'utf8')).toBe(before);
     });
+    test('uses the validated Linux npm executable instead of an exported npm function', () => {
+        const fixture = createFixture();
+        const nextFeed = '{"notices":[{"id":"linux-npm"}]}\n';
+        const result = runPublisher(fixture, nextFeed, {
+            'BASH_FUNC_npm%%': "() { printf 'Windows npm shim function invoked\\n' >&2; return 86; }",
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(join(fixture.dashboardDirectory, 'public', 'public-feed.json'), 'utf8')).toBe(nextFeed);
+    });
     test('refuses a dirty dashboard before exporting', () => {
         const fixture = createFixture();
         const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
@@ -229,6 +238,30 @@ test('collector rejects a Windows npm shim before collection starts', () => {
     expect(existsSync(collectRecordPath)).toBe(false);
     expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
     expect(git(fixture.dashboardDirectory, 'log', '--format=%s')).toBe('initial dashboard');
+});
+test('collector uses the validated Linux npm executable instead of an exported npm function', () => {
+    const feed = '{"notices":[{"id":"linux-npm"}]}\n';
+    const fixture = createFixture();
+    const xdgDataHome = join(fixture.rootDirectory, 'xdg-data');
+    const runtimeDirectory = join(xdgDataHome, 'housing');
+    const collectRecordPath = join(fixture.rootDirectory, 'collect-record.txt');
+    mkdirSync(runtimeDirectory, { recursive: true });
+    writeFileSync(join(runtimeDirectory, 'rental-housing.db'), 'test database\n');
+    const environment = {
+        ...scriptEnvironment(fixture, feed),
+        'BASH_FUNC_npm%%': "() { printf 'Windows npm shim function invoked\\n' >&2; return 86; }",
+        STUB_COLLECT_RECORD: collectRecordPath,
+        XDG_DATA_HOME: xdgDataHome,
+    };
+    delete environment.RENTAL_HOUSING_DB_PATH;
+    const result = spawnSync('/usr/bin/bash', [collectScript], {
+        cwd: fixture.rootDirectory,
+        encoding: 'utf8',
+        env: environment,
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(collectRecordPath, 'utf8')).toContain(`db=${join(runtimeDirectory, 'rental-housing.db')}`);
+    expect(readFileSync(join(fixture.dashboardDirectory, 'public', 'public-feed.json'), 'utf8')).toBe(feed);
 });
 describe('publisher repository safety', () => {
     test.each(['feature', 'detached'])('refuses a %s checkout before mutation', (checkoutState) => {
