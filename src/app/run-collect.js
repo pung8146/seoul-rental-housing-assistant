@@ -111,6 +111,7 @@ const withTimeoutFetch = (fetchImpl, timeoutMs) => (async (input, init) => fetch
 export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLECT_REGIONS, documentFetch = fetch, }) => {
     const events = [];
     const failures = [];
+    let successfulSourceCount = 0;
     for (const adapter of adapters) {
         const startedAt = new Date().toISOString();
         try {
@@ -160,6 +161,7 @@ export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLE
                 status: detailResult.failures.length > 0 ? 'partial' : 'success',
                 message: detailResult.failures.length > 0 ? `상세 수집 실패 ${detailResult.failures.length}건` : null,
             });
+            successfulSourceCount += 1;
         }
         catch (error) {
             const message = toMessage(error);
@@ -173,7 +175,7 @@ export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLE
             });
         }
     }
-    return { events, failures };
+    return { events, failures, successfulSourceCount };
 };
 const main = async () => {
     const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');

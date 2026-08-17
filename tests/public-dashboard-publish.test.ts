@@ -69,6 +69,9 @@ if [ "\${1:-}" = "run" ] && [ "\${2:-}" = "collect:notify" ]; then
     "\${RENTAL_HOUSING_DB_PATH:-}" \
     "\${RENTAL_HOUSING_CONTEXT_PATH:-}" \
     "\${COLLECTOR_ENV_MARKER:-}" > "\${STUB_COLLECT_RECORD:?}"
+  if [ "\${STUB_FAIL_STAGE:-}" = "collect" ]; then
+    exit 72
+  fi
 elif [ "\${1:-}" = "run" ] && [ "\${2:-}" = "export:public-feed" ]; then
   printf '%s\\n' "\${STUB_FEED_CONTENT:?}" > "\${PUBLIC_FEED_PATH:?}"
   if [ "\${STUB_FAIL_STAGE:-}" = "export" ]; then
@@ -274,6 +277,31 @@ test('collector uses the XDG housing runtime and then publishes', () => {
     'collect notify done',
   );
   expect(readFileSync(collectScript, 'utf8')).not.toContain('/home/pung8146/.openclaw');
+});
+
+test('collector failure prevents dashboard feed and remote mutation', () => {
+  const fixture = createFixture();
+  const originalFeed = readFileSync(
+    join(fixture.dashboardDirectory, 'public', 'public-feed.json'),
+    'utf8',
+  );
+  const originalRemoteHead = git(fixture.rootDirectory, '--git-dir', fixture.remoteDirectory, 'rev-parse', 'main');
+  const result = spawnSync('/usr/bin/bash', [collectScript], {
+    cwd: fixture.rootDirectory,
+    encoding: 'utf8',
+    env: {
+      ...scriptEnvironment(fixture, '{"notices":[{"id":"must-not-publish"}]}\n'),
+      STUB_FAIL_STAGE: 'collect',
+    },
+  });
+
+  expect(result.status).toBe(72);
+  expect(readFileSync(join(fixture.dashboardDirectory, 'public', 'public-feed.json'), 'utf8')).toBe(
+    originalFeed,
+  );
+  expect(git(fixture.rootDirectory, '--git-dir', fixture.remoteDirectory, 'rev-parse', 'main')).toBe(
+    originalRemoteHead,
+  );
 });
 
 test('collector rejects a Windows npm shim before collection starts', () => {

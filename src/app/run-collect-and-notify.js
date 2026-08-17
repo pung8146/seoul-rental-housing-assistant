@@ -8,6 +8,11 @@ const NO_CHANGE_MESSAGE = '새 공고/변경 없음';
 const shouldNotify = (message, alwaysNotify) => alwaysNotify || message.trim() !== NO_CHANGE_MESSAGE;
 const getNotificationPolicy = () => process.argv.includes('--notify-all') || process.env.RENTAL_HOUSING_NOTIFY_POLICY === 'all' ? 'all' : 'actionable';
 export const buildNotificationPayloadHash = (message) => createHash('sha256').update(message).digest('hex');
+export const markCollectionProcessOutcome = (successfulSourceCount) => {
+    if (successfulSourceCount === 0) {
+        process.exitCode = 1;
+    }
+};
 const main = async () => {
     const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
     const dryRun = process.argv.includes('--dry-run');
@@ -15,6 +20,7 @@ const main = async () => {
     const forceNotify = process.argv.includes('--force-notify');
     try {
         const result = await runCollect({ adapters: createDefaultAdapters(), repository });
+        markCollectionProcessOutcome(result.successfulSourceCount);
         const policy = getNotificationPolicy();
         const groups = groupNotificationEvents({
             events: result.events,

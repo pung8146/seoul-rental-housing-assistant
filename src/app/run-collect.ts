@@ -30,6 +30,7 @@ export type RunCollectInput = {
 export type RunCollectResult = {
   events: NotificationEvent[];
   failures: CollectFailure[];
+  successfulSourceCount: number;
 };
 
 const toMessage = (error: unknown): string => {
@@ -61,7 +62,7 @@ export const createDefaultAdapters = (): SourceAdapter[] => {
   return adapters;
 };
 
-export const formatCollectResult = (result: RunCollectResult): string =>
+export const formatCollectResult = (result: Pick<RunCollectResult, 'events' | 'failures'>): string =>
   formatDailySummary(result.events, result.failures) || '새 공고/변경 없음';
 
 const filterNoticesByRegion = (rawNotices: RawNoticeCandidate[], regions: string[]): RawNoticeCandidate[] =>
@@ -170,6 +171,7 @@ export const runCollect = async ({
 }: RunCollectInput): Promise<RunCollectResult> => {
   const events: NotificationEvent[] = [];
   const failures: CollectFailure[] = [];
+  let successfulSourceCount = 0;
 
   for (const adapter of adapters) {
     const startedAt = new Date().toISOString();
@@ -235,6 +237,7 @@ export const runCollect = async ({
         status: detailResult.failures.length > 0 ? 'partial' : 'success',
         message: detailResult.failures.length > 0 ? `상세 수집 실패 ${detailResult.failures.length}건` : null,
       });
+      successfulSourceCount += 1;
     } catch (error) {
       const message = toMessage(error);
       failures.push({ source: adapter.source, message });
@@ -248,7 +251,7 @@ export const runCollect = async ({
     }
   }
 
-  return { events, failures };
+  return { events, failures, successfulSourceCount };
 };
 
 const main = async () => {

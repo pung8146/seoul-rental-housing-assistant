@@ -17,6 +17,12 @@ const getNotificationPolicy = (): NotificationPolicy =>
 export const buildNotificationPayloadHash = (message: string): string =>
   createHash('sha256').update(message).digest('hex');
 
+export const markCollectionProcessOutcome = (successfulSourceCount: number): void => {
+  if (successfulSourceCount === 0) {
+    process.exitCode = 1;
+  }
+};
+
 const main = async () => {
   const repository = createRepository(process.env.RENTAL_HOUSING_DB_PATH ?? 'rental-housing.db');
   const dryRun = process.argv.includes('--dry-run');
@@ -25,6 +31,7 @@ const main = async () => {
 
   try {
     const result = await runCollect({ adapters: createDefaultAdapters(), repository });
+    markCollectionProcessOutcome(result.successfulSourceCount);
     const policy = getNotificationPolicy();
     const groups = groupNotificationEvents({
         events: result.events,

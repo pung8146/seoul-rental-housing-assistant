@@ -163,6 +163,7 @@ describe('sqlite repository', () => {
 
     const result = await runCollect({ adapters: [adapter], repository });
 
+    expect(result.successfulSourceCount).toBe(0);
     expect(result.failures).toEqual([
       {
         source: 'lh',
@@ -175,6 +176,33 @@ describe('sqlite repository', () => {
         status: 'partial',
         message: '수집 결과가 0건입니다. 사이트 구조 변경이나 일시적인 빈 응답을 확인하세요.',
       },
+    ]);
+  });
+
+  it('reports zero successful sources when every adapter fails', async () => {
+    const repository = createRepository(':memory:');
+    const firstAdapter: SourceAdapter = {
+      source: 'lh',
+      async fetchNotices() {
+        throw new Error('lh offline');
+      },
+    };
+    const secondAdapter: SourceAdapter = {
+      source: 'sh',
+      async fetchNotices() {
+        throw new Error('sh offline');
+      },
+    };
+
+    const result = await runCollect({
+      adapters: [firstAdapter, secondAdapter],
+      repository,
+    });
+
+    expect(result.successfulSourceCount).toBe(0);
+    expect(result.failures).toEqual([
+      { source: 'lh', message: 'lh offline' },
+      { source: 'sh', message: 'sh offline' },
     ]);
   });
 
@@ -220,6 +248,7 @@ describe('sqlite repository', () => {
       repository,
     });
 
+    expect(firstRun.successfulSourceCount).toBe(1);
     expect(firstRun.events).toHaveLength(1);
     expect(firstRun.events[0]).toMatchObject({
       type: 'new_notice',
