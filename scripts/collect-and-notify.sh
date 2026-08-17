@@ -97,6 +97,7 @@ if [ -e "$ENV_FILE" ]; then
   umask 077
 fi
 
+export RENTAL_HOUSING_APP_DIR="$APP_DIR"
 export RENTAL_HOUSING_STATE_DIR="$STATE_DIR"
 export RENTAL_HOUSING_ENV_FILE="$ENV_FILE"
 export RENTAL_HOUSING_DB_PATH="$(canonicalize_path "${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}")"

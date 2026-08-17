@@ -39,8 +39,8 @@ printf 'collect|cwd=%s|state=%s|env=%s|db=%s|context=%s|dashboard=%s|nodebin=%s\
   "$HOUSING_NODE_BIN_DIR" >> "$STUB_WORK_LOG"
 `);
     writeExecutable(join(scriptsDirectory, 'publish-public-dashboard.sh'), `#!/usr/bin/env bash
-printf 'publish|cwd=%s|state=%s|env=%s|db=%s|context=%s|dashboard=%s|nodebin=%s\\n' \\
-  "$PWD" "$RENTAL_HOUSING_STATE_DIR" "$RENTAL_HOUSING_ENV_FILE" \\
+printf 'publish|cwd=%s|app=%s|state=%s|env=%s|db=%s|context=%s|dashboard=%s|nodebin=%s\\n' \\
+  "$PWD" "$RENTAL_HOUSING_APP_DIR" "$RENTAL_HOUSING_STATE_DIR" "$RENTAL_HOUSING_ENV_FILE" \\
   "$RENTAL_HOUSING_DB_PATH" "$RENTAL_HOUSING_CONTEXT_PATH" "$HOUSING_DASHBOARD_DIR" \\
   "$HOUSING_NODE_BIN_DIR" >> "$STUB_WORK_LOG"
 `);
@@ -121,6 +121,17 @@ test('canonicalizes every runtime path against the invocation cwd before changin
     }
     expect(existsSync(fixture.lockFile)).toBe(true);
     expect(existsSync(join(fixture.appDirectory, 'runtime', 'collect.flock'))).toBe(false);
+});
+test('passes the canonical app directory to the publisher after changing cwd', () => {
+    const fixture = createFixture('publisher-app');
+    const result = runCollector(fixture);
+    expect(result.status, result.stderr).toBe(0);
+    const publishLine = readFileSync(fixture.workLog, 'utf8')
+        .trim()
+        .split('\n')
+        .find((line) => line.startsWith('publish|'));
+    expect(publishLine).toContain(`cwd=${fixture.appDirectory}`);
+    expect(publishLine).toContain(`app=${fixture.appDirectory}`);
 });
 test('keeps each invocation cwd lock and database in the same canonical scope', () => {
     const first = createFixture('cwd-one');
