@@ -17,6 +17,8 @@ RESTORE_TEMP=''
 FEED_REPLACED=0
 COMMIT_CREATED=0
 BASELINE_HEAD=''
+ORIGIN_FETCH_URL=''
+ORIGIN_PUSH_URL=''
 
 fail() {
   printf '%s\n' "$1" >&2
@@ -103,18 +105,54 @@ validate_regular_feed() {
   git -C "$DASHBOARD_DIR" ls-files --error-unmatch -- "$FEED_RELATIVE_PATH" >/dev/null 2>&1 || fail "public housing feed must be tracked: $FEED_RELATIVE_PATH"
 }
 
+capture_origin_urls() {
+  local -a fetch_urls push_urls
+
+  mapfile -t fetch_urls < <(git -C "$DASHBOARD_DIR" remote get-url --all origin)
+  [ "${#fetch_urls[@]}" -eq 1 ] || fail 'dashboard origin must have exactly one fetch URL'
+  mapfile -t push_urls < <(git -C "$DASHBOARD_DIR" remote get-url --push --all origin)
+  [ "${#push_urls[@]}" -eq 1 ] || fail 'dashboard origin must have exactly one push URL'
+
+  if [ -z "$ORIGIN_FETCH_URL" ]; then
+    ORIGIN_FETCH_URL="${fetch_urls[0]}"
+    ORIGIN_PUSH_URL="${push_urls[0]}"
+  elif [ "${fetch_urls[0]}" != "$ORIGIN_FETCH_URL" ] || [ "${push_urls[0]}" != "$ORIGIN_PUSH_URL" ]; then
+    fail 'dashboard origin URL changed during publishing'
+  fi
+}
+
+remote_main_oid() {
+  local output oid ref extra
+
+  output="$(GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" ls-remote --exit-code "$1" refs/heads/main)" \
+    || fail 'dashboard push URL main branch cannot be queried'
+  read -r oid ref extra <<< "$output"
+  [ -n "$oid" ] && [ "$ref" = 'refs/heads/main' ] && [ -z "${extra:-}" ] \
+    || fail 'dashboard push URL returned an invalid main branch'
+  printf '%s\n' "$oid"
+}
+
+validate_push_context() {
+  local expected_head=$1 expected_remote_oid=$2 current_remote_oid current_branch current_head
+
+  capture_origin_urls
+  current_remote_oid="$(remote_main_oid "$ORIGIN_PUSH_URL")"
+  [ "$current_remote_oid" = "$expected_remote_oid" ] || fail 'dashboard remote main changed before push'
+  capture_origin_urls
+  current_branch="$(git -C "$DASHBOARD_DIR" symbolic-ref --quiet --short HEAD || true)"
+  [ "$current_branch" = 'main' ] || fail 'dashboard branch changed before push'
+  current_head="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
+  [ "$current_head" = "$expected_head" ] || fail 'dashboard HEAD changed before push'
+}
+
 validate_repository_identity() {
-  local current_branch current_head current_fetch_url current_push_url
+  local current_branch current_head
 
   current_branch="$(git -C "$DASHBOARD_DIR" symbolic-ref --quiet --short HEAD || true)"
   [ "$current_branch" = "main" ] || fail "dashboard branch changed during publishing: ${current_branch:-detached HEAD}"
   current_head="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
   [ "$current_head" = "$BASELINE_HEAD" ] || fail 'dashboard HEAD changed during publishing'
-  current_fetch_url="$(git -C "$DASHBOARD_DIR" remote get-url origin)"
-  current_push_url="$(git -C "$DASHBOARD_DIR" remote get-url --push origin)"
-  if [ "$current_fetch_url" != "$ORIGIN_FETCH_URL" ] || [ "$current_push_url" != "$ORIGIN_PUSH_URL" ]; then
-    fail 'dashboard origin URL changed during publishing'
-  fi
+  capture_origin_urls
 }
 
 validate_exported_feed() {
@@ -216,14 +254,15 @@ esac
 FEED_PATH="$PUBLIC_DIR/public-feed.json"
 PENDING_MARKER="$GIT_DIR/housing-publish.pending"
 
-command -v flock >/dev/null 2>&1 || fail 'flock is required for dashboard publishing'
+FLOCK_BIN="$(readlink -f /usr/bin/flock 2>/dev/null)" || fail 'canonical Linux flock is required for dashboard publishing'
+[ "$FLOCK_BIN" = '/usr/bin/flock' ] && [ -x "$FLOCK_BIN" ] || fail 'canonical Linux flock is required for dashboard publishing'
 LOCK_FILE="$GIT_DIR/housing-publish.flock"
 if { [ -e "$LOCK_FILE" ] || [ -L "$LOCK_FILE" ]; } && { [ -L "$LOCK_FILE" ] || [ ! -f "$LOCK_FILE" ]; }; then
   fail "dashboard publisher lock endpoint must be a regular non-symlink file: $LOCK_FILE"
 fi
 exec 9>>"$LOCK_FILE"
 [ ! -L "$LOCK_FILE" ] && [ -f "$LOCK_FILE" ] || fail "dashboard publisher lock endpoint became unsafe: $LOCK_FILE"
-flock -n 9 || fail "housing publisher already running for dashboard: $DASHBOARD_DIR"
+"$FLOCK_BIN" -n 9 || fail "housing publisher already running for dashboard: $DASHBOARD_DIR"
 
 [ -z "$(git -C "$DASHBOARD_DIR" status --porcelain --untracked-files=all)" ] || fail "dashboard must be clean before publishing: $DASHBOARD_DIR"
 CURRENT_BRANCH="$(git -C "$DASHBOARD_DIR" symbolic-ref --quiet --short HEAD || true)"
@@ -236,11 +275,15 @@ case "$BASELINE_TRACKED_MODE" in
 esac
 [ "$(worktree_feed_mode)" = "$BASELINE_TRACKED_MODE" ] || fail 'public housing feed worktree mode does not match Git'
 
-ORIGIN_FETCH_URL="$(git -C "$DASHBOARD_DIR" remote get-url origin)"
-ORIGIN_PUSH_URL="$(git -C "$DASHBOARD_DIR" remote get-url --push origin)"
-GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" fetch --quiet origin '+refs/heads/main:refs/remotes/origin/main'
+capture_origin_urls
+GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" fetch --quiet "$ORIGIN_FETCH_URL" '+refs/heads/main:refs/remotes/origin/main'
 LOCAL_HEAD="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
-REMOTE_HEAD="$(git -C "$DASHBOARD_DIR" rev-parse refs/remotes/origin/main)"
+FETCHED_REMOTE_HEAD="$(git -C "$DASHBOARD_DIR" rev-parse refs/remotes/origin/main)"
+REMOTE_HEAD="$(remote_main_oid "$ORIGIN_PUSH_URL")"
+[ "$REMOTE_HEAD" = "$FETCHED_REMOTE_HEAD" ] || fail 'dashboard fetch and push URLs disagree on origin main'
+capture_origin_urls
+BASELINE_HEAD="$LOCAL_HEAD"
+[ "$(git -C "$DASHBOARD_DIR" rev-parse HEAD)" = "$BASELINE_HEAD" ] || fail 'dashboard HEAD changed after fetch'
 
 if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
   [ ! -e "$PENDING_MARKER" ] && [ ! -L "$PENDING_MARKER" ] || clear_pending_marker
@@ -248,9 +291,10 @@ elif git -C "$DASHBOARD_DIR" merge-base --is-ancestor "$REMOTE_HEAD" "$LOCAL_HEA
   read_pending_marker
   [ "$PENDING_OID" = "$LOCAL_HEAD" ] || fail 'dashboard pending publish marker does not match HEAD'
   pending_commit_is_allowed "$LOCAL_HEAD" || fail 'dashboard pending publish commit is not the single allowed automation feed commit'
+  validate_push_context "$BASELINE_HEAD" "$REMOTE_HEAD"
   GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" push \
     --force-with-lease="refs/heads/main:$REMOTE_HEAD" \
-    origin "$LOCAL_HEAD:refs/heads/main"
+    "$ORIGIN_PUSH_URL" "$LOCAL_HEAD:refs/heads/main"
   clear_pending_marker
   REMOTE_HEAD="$LOCAL_HEAD"
 elif git -C "$DASHBOARD_DIR" merge-base --is-ancestor "$LOCAL_HEAD" "$REMOTE_HEAD"; then
@@ -259,7 +303,8 @@ else
   fail 'dashboard main has diverged from origin/main; reconcile it explicitly before publishing'
 fi
 
-BASELINE_HEAD="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
+[ "$BASELINE_HEAD" = "$REMOTE_HEAD" ] || fail 'dashboard local and remote baselines differ after pending publish handling'
+[ "$(git -C "$DASHBOARD_DIR" rev-parse HEAD)" = "$BASELINE_HEAD" ] || fail 'dashboard HEAD changed before exporting'
 DATABASE_INPUT="${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}"
 [ -f "$DATABASE_INPUT" ] || fail "housing database file not found: $DATABASE_INPUT"
 RENTAL_HOUSING_DB_PATH="$(readlink -f -- "$DATABASE_INPUT")" || fail "housing database path cannot be resolved: $DATABASE_INPUT"
@@ -321,12 +366,8 @@ PUBLISH_COMMIT="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
 validate_exported_feed
 write_pending_marker "$PUBLISH_COMMIT"
 
-[ "$(git -C "$DASHBOARD_DIR" symbolic-ref --quiet --short HEAD || true)" = "main" ] || fail 'dashboard branch changed before push'
-[ "$(git -C "$DASHBOARD_DIR" rev-parse HEAD)" = "$PUBLISH_COMMIT" ] || fail 'dashboard HEAD changed before push'
-if [ "$(git -C "$DASHBOARD_DIR" remote get-url origin)" != "$ORIGIN_FETCH_URL" ] || [ "$(git -C "$DASHBOARD_DIR" remote get-url --push origin)" != "$ORIGIN_PUSH_URL" ]; then
-  fail 'dashboard origin URL changed before push'
-fi
+validate_push_context "$PUBLISH_COMMIT" "$REMOTE_HEAD"
 GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" push \
   --force-with-lease="refs/heads/main:$REMOTE_HEAD" \
-  origin "$PUBLISH_COMMIT:refs/heads/main"
+  "$ORIGIN_PUSH_URL" "$PUBLISH_COMMIT:refs/heads/main"
 clear_pending_marker
