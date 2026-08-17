@@ -2,10 +2,34 @@
 set -euo pipefail
 umask 077
 
+INVOCATION_DIR="$(pwd -P)"
+
+canonicalize_path() {
+  local path="$1"
+
+  case "$path" in
+    /*) ;;
+    *) path="$INVOCATION_DIR/$path" ;;
+  esac
+  /usr/bin/realpath -m -- "$path"
+}
+
+canonicalize_file_path() {
+  local path="$1"
+
+  case "$path" in
+    /*) ;;
+    *) path="$INVOCATION_DIR/$path" ;;
+  esac
+  printf '%s/%s\n' \
+    "$(/usr/bin/realpath -m -- "$(dirname "$path")")" \
+    "$(basename "$path")"
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="${RENTAL_HOUSING_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-STATE_DIR="${RENTAL_HOUSING_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/housing}"
-ENV_FILE="${RENTAL_HOUSING_ENV_FILE:-$STATE_DIR/collector.env}"
+APP_DIR="$(canonicalize_path "${RENTAL_HOUSING_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}")"
+STATE_DIR="$(canonicalize_path "${RENTAL_HOUSING_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/housing}")"
+ENV_FILE="$(canonicalize_file_path "${RENTAL_HOUSING_ENV_FILE:-$STATE_DIR/collector.env}")"
 LOG_DIR="$STATE_DIR/logs"
 LOCK_FILE="$STATE_DIR/collect.flock"
 LOG_FILE="$LOG_DIR/collect-notify.log"
@@ -14,7 +38,20 @@ NPM_BIN=''
 
 mkdir -p "$LOG_DIR"
 : >> "$LOG_FILE"
+
+if [ -L "$LOCK_FILE" ] || { [ -e "$LOCK_FILE" ] && [ ! -f "$LOCK_FILE" ]; }; then
+  printf 'collect.flock must be a regular non-symlink file: %s\n' "$LOCK_FILE" >&2
+  exit 1
+fi
+
 exec {LOCK_FD}>>"$LOCK_FILE"
+
+if [ -L "$LOCK_FILE" ] || [ ! -f "$LOCK_FILE" ] ||
+  [ "$(/usr/bin/stat -Lc '%d:%i' -- "$LOCK_FILE")" != "$(/usr/bin/stat -Lc '%d:%i' -- "/proc/$$/fd/$LOCK_FD")" ]; then
+  printf 'collect.flock changed while opening: %s\n' "$LOCK_FILE" >&2
+  exit 1
+fi
+
 chmod 600 "$LOG_FILE" "$LOCK_FILE"
 
 if ! /usr/bin/flock -n "$LOCK_FD"; then
@@ -61,8 +98,12 @@ if [ -e "$ENV_FILE" ]; then
 fi
 
 export RENTAL_HOUSING_STATE_DIR="$STATE_DIR"
-export RENTAL_HOUSING_DB_PATH="${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}"
-export RENTAL_HOUSING_CONTEXT_PATH="${RENTAL_HOUSING_CONTEXT_PATH:-$STATE_DIR/telegram-context.json}"
+export RENTAL_HOUSING_ENV_FILE="$ENV_FILE"
+export RENTAL_HOUSING_DB_PATH="$(canonicalize_path "${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}")"
+export RENTAL_HOUSING_CONTEXT_PATH="$(canonicalize_path "${RENTAL_HOUSING_CONTEXT_PATH:-$STATE_DIR/telegram-context.json}")"
+if [ -n "${HOUSING_DASHBOARD_DIR:-}" ]; then
+  export HOUSING_DASHBOARD_DIR="$(canonicalize_path "$HOUSING_DASHBOARD_DIR")"
+fi
 
 linux_node_and_npm_available() {
   local node_path npm_path
@@ -90,19 +131,19 @@ select_linux_node() {
   local requested_node_bin_dir
 
   if [ -n "${HOUSING_NODE_BIN_DIR:-}" ]; then
-    requested_node_bin_dir="$HOUSING_NODE_BIN_DIR"
-    case "$requested_node_bin_dir" in
-      /*) ;;
-      *) requested_node_bin_dir="$(pwd)/$requested_node_bin_dir" ;;
-    esac
-    requested_node_bin_dir="$(cd "$requested_node_bin_dir" 2>/dev/null && pwd -P)" || {
+    requested_node_bin_dir="$(canonicalize_path "$HOUSING_NODE_BIN_DIR")"
+    if [ ! -d "$requested_node_bin_dir" ]; then
       printf 'HOUSING_NODE_BIN_DIR is not a readable directory\n' >&2
       return 1
-    }
+    fi
+    export HOUSING_NODE_BIN_DIR="$requested_node_bin_dir"
     export PATH="$requested_node_bin_dir:/usr/local/bin:/usr/bin:/bin"
   fi
 
   if linux_node_and_npm_available; then
+    if [ -z "${HOUSING_NODE_BIN_DIR:-}" ]; then
+      export HOUSING_NODE_BIN_DIR="$(dirname "$NODE_BIN")"
+    fi
     return
   fi
 
@@ -120,6 +161,7 @@ select_linux_node() {
     printf 'Linux Node.js and Linux npm are required\n' >&2
     return 1
   fi
+  export HOUSING_NODE_BIN_DIR="$(dirname "$NODE_BIN")"
 }
 
 {
