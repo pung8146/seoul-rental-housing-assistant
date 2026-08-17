@@ -8,7 +8,15 @@ STATE_DIR="${RENTAL_HOUSING_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/hous
 DASHBOARD_INPUT="${HOUSING_DASHBOARD_DIR:-$HOME/projects/housing/web-dashboard}"
 FEED_RELATIVE_PATH="public/public-feed.json"
 AUTOMATION_COMMIT_SUBJECT="data: update public housing notices"
+NODE_BIN=''
 NPM_BIN=''
+TEMP_FEED=''
+BACKUP_FEED=''
+PENDING_TEMP=''
+RESTORE_TEMP=''
+FEED_REPLACED=0
+COMMIT_CREATED=0
+BASELINE_HEAD=''
 
 fail() {
   printf '%s\n' "$1" >&2
@@ -16,27 +24,35 @@ fail() {
 }
 
 linux_node_and_npm_available() {
-  local npm_path npm_real_path
+  local candidate node_path node_real_path npm_path npm_real_path
 
-  command -v node >/dev/null 2>&1 || return 1
-  [ "$(node -p 'process.platform' 2>/dev/null)" = "linux" ] || return 1
+  node_path="$(type -P node 2>/dev/null)" || return 1
   npm_path="$(type -P npm 2>/dev/null)" || return 1
+  node_real_path="$(readlink -f "$node_path" 2>/dev/null)" || return 1
   npm_real_path="$(readlink -f "$npm_path" 2>/dev/null)" || return 1
 
-  case "$npm_path" in
-    /mnt/* | *.bat | *.cmd | *.exe) return 1 ;;
-  esac
-  case "$npm_real_path" in
-    /mnt/* | *.bat | *.cmd | *.exe) return 1 ;;
-  esac
+  for candidate in "$node_path" "$node_real_path" "$npm_path" "$npm_real_path"; do
+    case "$candidate" in
+      /mnt/* | *.bat | *.cmd | *.exe) return 1 ;;
+    esac
+  done
+  [ "$("$node_real_path" -p 'process.platform' 2>/dev/null)" = "linux" ] || return 1
 
-  NPM_BIN="$npm_path"
-  return 0
+  NODE_BIN="$node_real_path"
+  NPM_BIN="$npm_real_path"
 }
 
 select_linux_node() {
+  local node_bin_dir
+
   if [ -n "${HOUSING_NODE_BIN_DIR:-}" ]; then
-    export PATH="$HOUSING_NODE_BIN_DIR:/usr/local/bin:/usr/bin:/bin"
+    case "$HOUSING_NODE_BIN_DIR" in
+      /*) node_bin_dir="$HOUSING_NODE_BIN_DIR" ;;
+      *)
+        node_bin_dir="$(cd "$HOUSING_NODE_BIN_DIR" 2>/dev/null && pwd -P)" || fail "Linux Node.js bin directory not found: $HOUSING_NODE_BIN_DIR"
+        ;;
+    esac
+    export PATH="$node_bin_dir:/usr/local/bin:/usr/bin:/bin"
   fi
 
   if linux_node_and_npm_available; then
@@ -51,16 +67,141 @@ select_linux_node() {
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
   nvm use --silent default >/dev/null
+  linux_node_and_npm_available || fail 'Linux Node.js and Linux npm are required'
+}
 
-  if ! linux_node_and_npm_available; then
-    fail 'Linux Node.js and Linux npm are required'
+tracked_feed_mode() {
+  git -C "$DASHBOARD_DIR" ls-files -s -- "$FEED_RELATIVE_PATH" | awk 'NR == 1 { print $1 }'
+}
+
+worktree_feed_mode() {
+  if [ -x "$FEED_PATH" ]; then
+    printf '100755\n'
+  else
+    printf '100644\n'
   fi
 }
 
-if ! git -C "$DASHBOARD_INPUT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  fail "dashboard Git repository not found: $DASHBOARD_INPUT"
-fi
+feed_hash() {
+  sha256sum "$1" | awk '{ print $1 }'
+}
 
+validate_public_directory() {
+  local current_public_dir
+
+  if [ -L "$PUBLIC_INPUT" ] || [ ! -d "$PUBLIC_INPUT" ]; then
+    fail "dashboard public path must be a regular directory: $PUBLIC_INPUT"
+  fi
+  current_public_dir="$(cd "$PUBLIC_INPUT" && pwd -P)"
+  [ "$current_public_dir" = "$PUBLIC_DIR" ] || fail 'dashboard public path changed during publishing'
+}
+
+validate_regular_feed() {
+  if [ -L "$FEED_PATH" ] || [ ! -f "$FEED_PATH" ]; then
+    fail "public housing feed must be a regular file: $FEED_PATH"
+  fi
+  git -C "$DASHBOARD_DIR" ls-files --error-unmatch -- "$FEED_RELATIVE_PATH" >/dev/null 2>&1 || fail "public housing feed must be tracked: $FEED_RELATIVE_PATH"
+}
+
+validate_repository_identity() {
+  local current_branch current_head current_fetch_url current_push_url
+
+  current_branch="$(git -C "$DASHBOARD_DIR" symbolic-ref --quiet --short HEAD || true)"
+  [ "$current_branch" = "main" ] || fail "dashboard branch changed during publishing: ${current_branch:-detached HEAD}"
+  current_head="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
+  [ "$current_head" = "$BASELINE_HEAD" ] || fail 'dashboard HEAD changed during publishing'
+  current_fetch_url="$(git -C "$DASHBOARD_DIR" remote get-url origin)"
+  current_push_url="$(git -C "$DASHBOARD_DIR" remote get-url --push origin)"
+  if [ "$current_fetch_url" != "$ORIGIN_FETCH_URL" ] || [ "$current_push_url" != "$ORIGIN_PUSH_URL" ]; then
+    fail 'dashboard origin URL changed during publishing'
+  fi
+}
+
+validate_exported_feed() {
+  validate_public_directory
+  validate_regular_feed
+  [ "$(tracked_feed_mode)" = "$BASELINE_TRACKED_MODE" ] || fail 'public housing feed tracked mode changed during publishing'
+  [ "$(worktree_feed_mode)" = "$BASELINE_TRACKED_MODE" ] || fail 'public housing feed executable mode changed during publishing'
+  [ "$(stat -c %a "$FEED_PATH")" = "$EXPORTED_FILE_MODE" ] || fail 'public housing feed file mode changed during publishing'
+  [ "$(feed_hash "$FEED_PATH")" = "$EXPORTED_HASH" ] || fail 'public housing feed content changed during dashboard build'
+}
+
+read_pending_marker() {
+  if [ -L "$PENDING_MARKER" ] || [ ! -f "$PENDING_MARKER" ]; then
+    fail 'dashboard pending publish marker is missing or unsafe'
+  fi
+  PENDING_OID="$(sed -n '1p' "$PENDING_MARKER")"
+  [ "$(wc -l < "$PENDING_MARKER")" -eq 1 ] || fail 'dashboard pending publish marker is invalid'
+}
+
+clear_pending_marker() {
+  if [ -L "$PENDING_MARKER" ]; then
+    fail 'dashboard pending publish marker is unsafe'
+  fi
+  rm -f -- "$PENDING_MARKER"
+}
+
+write_pending_marker() {
+  local oid=$1
+
+  PENDING_TEMP="$(mktemp "$GIT_DIR/housing-publish.pending.XXXXXX")"
+  printf '%s\n' "$oid" > "$PENDING_TEMP"
+  chmod 0600 "$PENDING_TEMP"
+  mv -f -- "$PENDING_TEMP" "$PENDING_MARKER"
+  PENDING_TEMP=''
+}
+
+pending_commit_is_allowed() {
+  local commit=$1 subject changed_paths parent
+
+  [ "$(git -C "$DASHBOARD_DIR" rev-list --count "$REMOTE_HEAD..$commit")" = "1" ] || return 1
+  parent="$(git -C "$DASHBOARD_DIR" rev-parse "$commit^")"
+  [ "$parent" = "$REMOTE_HEAD" ] || return 1
+  subject="$(git -C "$DASHBOARD_DIR" show -s --format=%s "$commit")"
+  changed_paths="$(git -C "$DASHBOARD_DIR" diff-tree --no-commit-id --name-only -r "$commit")"
+  [ "$subject" = "$AUTOMATION_COMMIT_SUBJECT" ] && [ "$changed_paths" = "$FEED_RELATIVE_PATH" ]
+}
+
+cleanup() {
+  local status=$? current_head current_public_dir keep_backup=0
+  set +e
+
+  if [ "$status" -ne 0 ] && [ "$FEED_REPLACED" -eq 1 ] && [ "$COMMIT_CREATED" -eq 0 ] && [ -n "$BASELINE_HEAD" ] && [ -n "$BACKUP_FEED" ]; then
+    current_head="$(git -C "$DASHBOARD_DIR" rev-parse HEAD 2>/dev/null)"
+    current_public_dir=''
+    if [ ! -L "$PUBLIC_INPUT" ] && [ -d "$PUBLIC_INPUT" ]; then
+      current_public_dir="$(cd "$PUBLIC_INPUT" 2>/dev/null && pwd -P)"
+    fi
+    if [ "$current_head" = "$BASELINE_HEAD" ] && [ "$current_public_dir" = "$PUBLIC_DIR" ]; then
+      RESTORE_TEMP="$(mktemp "$PUBLIC_DIR/.public-feed.restore.XXXXXX" 2>/dev/null)"
+      if [ -n "$RESTORE_TEMP" ] \
+        && cp -p -- "$BACKUP_FEED" "$RESTORE_TEMP" \
+        && git -C "$DASHBOARD_DIR" reset -q "$BASELINE_HEAD" -- "$FEED_RELATIVE_PATH" \
+        && mv -Tf -- "$RESTORE_TEMP" "$FEED_PATH"; then
+        RESTORE_TEMP=''
+      else
+        keep_backup=1
+      fi
+    else
+      keep_backup=1
+    fi
+    if [ "$keep_backup" -eq 1 ]; then
+      printf 'public housing feed rollback failed; backup retained: %s\n' "$BACKUP_FEED" >&2
+    fi
+  fi
+
+  [ -z "$TEMP_FEED" ] || rm -f -- "$TEMP_FEED"
+  [ -z "$RESTORE_TEMP" ] || rm -f -- "$RESTORE_TEMP"
+  if [ -n "$BACKUP_FEED" ] && [ "$keep_backup" -eq 0 ]; then
+    rm -f -- "$BACKUP_FEED"
+  fi
+  [ -z "$PENDING_TEMP" ] || rm -f -- "$PENDING_TEMP"
+  trap - EXIT
+  exit "$status"
+}
+trap cleanup EXIT
+
+git -C "$DASHBOARD_INPUT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "dashboard Git repository not found: $DASHBOARD_INPUT"
 DASHBOARD_DIR="$(cd "$DASHBOARD_INPUT" && pwd -P)"
 GIT_DIR="$(git -C "$DASHBOARD_DIR" rev-parse --absolute-git-dir)"
 PUBLIC_INPUT="$DASHBOARD_DIR/public"
@@ -72,100 +213,57 @@ case "$PUBLIC_DIR/" in
   "$DASHBOARD_DIR"/*) ;;
   *) fail "dashboard public path escapes the repository: $PUBLIC_DIR" ;;
 esac
-
 FEED_PATH="$PUBLIC_DIR/public-feed.json"
-if [ -L "$FEED_PATH" ] || [ ! -f "$FEED_PATH" ]; then
-  fail "public housing feed must be a regular file: $FEED_PATH"
+PENDING_MARKER="$GIT_DIR/housing-publish.pending"
+
+command -v flock >/dev/null 2>&1 || fail 'flock is required for dashboard publishing'
+LOCK_FILE="$GIT_DIR/housing-publish.flock"
+if { [ -e "$LOCK_FILE" ] || [ -L "$LOCK_FILE" ]; } && { [ -L "$LOCK_FILE" ] || [ ! -f "$LOCK_FILE" ]; }; then
+  fail "dashboard publisher lock endpoint must be a regular non-symlink file: $LOCK_FILE"
 fi
-if ! git -C "$DASHBOARD_DIR" ls-files --error-unmatch -- "$FEED_RELATIVE_PATH" >/dev/null 2>&1; then
-  fail "public housing feed must be tracked: $FEED_RELATIVE_PATH"
-fi
+exec 9>>"$LOCK_FILE"
+[ ! -L "$LOCK_FILE" ] && [ -f "$LOCK_FILE" ] || fail "dashboard publisher lock endpoint became unsafe: $LOCK_FILE"
+flock -n 9 || fail "housing publisher already running for dashboard: $DASHBOARD_DIR"
 
-LOCK_DIR="$GIT_DIR/housing-publish.lock"
-LOCK_ACQUIRED=0
-TEMP_FEED=''
-BACKUP_FEED=''
-FEED_REPLACED=0
-COMMIT_CREATED=0
-
-cleanup() {
-  local status=$?
-  set +e
-
-  if [ "$status" -ne 0 ] && [ "$FEED_REPLACED" -eq 1 ] && [ "$COMMIT_CREATED" -eq 0 ]; then
-    git -C "$DASHBOARD_DIR" reset -q HEAD -- "$FEED_RELATIVE_PATH"
-    rm -f -- "$FEED_PATH"
-    cp -p -- "$BACKUP_FEED" "$FEED_PATH"
-  fi
-
-  if [ -n "$TEMP_FEED" ]; then
-    rm -f -- "$TEMP_FEED"
-  fi
-  if [ -n "$BACKUP_FEED" ]; then
-    rm -f -- "$BACKUP_FEED"
-  fi
-  if [ "$LOCK_ACQUIRED" -eq 1 ]; then
-    rmdir "$LOCK_DIR"
-  fi
-
-  trap - EXIT
-  exit "$status"
-}
-trap cleanup EXIT
-
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  fail "housing publisher already running for dashboard: $DASHBOARD_DIR"
-fi
-LOCK_ACQUIRED=1
-
-if [ -n "$(git -C "$DASHBOARD_DIR" status --porcelain --untracked-files=all)" ]; then
-  fail "dashboard must be clean before publishing: $DASHBOARD_DIR"
-fi
-
+[ -z "$(git -C "$DASHBOARD_DIR" status --porcelain --untracked-files=all)" ] || fail "dashboard must be clean before publishing: $DASHBOARD_DIR"
 CURRENT_BRANCH="$(git -C "$DASHBOARD_DIR" symbolic-ref --quiet --short HEAD || true)"
-if [ "$CURRENT_BRANCH" != "main" ]; then
-  fail "dashboard publisher must run on main, not ${CURRENT_BRANCH:-detached HEAD}"
-fi
+[ "$CURRENT_BRANCH" = "main" ] || fail "dashboard publisher must run on main, not ${CURRENT_BRANCH:-detached HEAD}"
+validate_regular_feed
+BASELINE_TRACKED_MODE="$(tracked_feed_mode)"
+case "$BASELINE_TRACKED_MODE" in
+  100644 | 100755) ;;
+  *) fail 'public housing feed must use a regular tracked file mode' ;;
+esac
+[ "$(worktree_feed_mode)" = "$BASELINE_TRACKED_MODE" ] || fail 'public housing feed worktree mode does not match Git'
 
-GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" fetch --quiet origin \
-  '+refs/heads/main:refs/remotes/origin/main'
+ORIGIN_FETCH_URL="$(git -C "$DASHBOARD_DIR" remote get-url origin)"
+ORIGIN_PUSH_URL="$(git -C "$DASHBOARD_DIR" remote get-url --push origin)"
+GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" fetch --quiet origin '+refs/heads/main:refs/remotes/origin/main'
 LOCAL_HEAD="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
 REMOTE_HEAD="$(git -C "$DASHBOARD_DIR" rev-parse refs/remotes/origin/main)"
 
-automation_commits_only() {
-  local commit subject changed_paths
-
-  while IFS= read -r commit; do
-    [ -n "$commit" ] || continue
-    subject="$(git -C "$DASHBOARD_DIR" show -s --format=%s "$commit")"
-    changed_paths="$(git -C "$DASHBOARD_DIR" diff-tree --no-commit-id --name-only -r "$commit")"
-    if [ "$subject" != "$AUTOMATION_COMMIT_SUBJECT" ] \
-      || [ "$changed_paths" != "$FEED_RELATIVE_PATH" ]; then
-      return 1
-    fi
-  done < <(git -C "$DASHBOARD_DIR" rev-list --reverse "$REMOTE_HEAD..$LOCAL_HEAD")
-
-  return 0
-}
-
-if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
-  if git -C "$DASHBOARD_DIR" merge-base --is-ancestor "$REMOTE_HEAD" "$LOCAL_HEAD"; then
-    if ! automation_commits_only; then
-      fail 'dashboard has non-automation commits ahead of origin/main; push them explicitly'
-    fi
-    GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" push origin HEAD:main
-  elif git -C "$DASHBOARD_DIR" merge-base --is-ancestor "$LOCAL_HEAD" "$REMOTE_HEAD"; then
-    fail 'dashboard main is behind origin/main; update it explicitly before publishing'
-  else
-    fail 'dashboard main has diverged from origin/main; reconcile it explicitly before publishing'
-  fi
+if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
+  [ ! -e "$PENDING_MARKER" ] && [ ! -L "$PENDING_MARKER" ] || clear_pending_marker
+elif git -C "$DASHBOARD_DIR" merge-base --is-ancestor "$REMOTE_HEAD" "$LOCAL_HEAD"; then
+  read_pending_marker
+  [ "$PENDING_OID" = "$LOCAL_HEAD" ] || fail 'dashboard pending publish marker does not match HEAD'
+  pending_commit_is_allowed "$LOCAL_HEAD" || fail 'dashboard pending publish commit is not the single allowed automation feed commit'
+  GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" push \
+    --force-with-lease="refs/heads/main:$REMOTE_HEAD" \
+    origin "$LOCAL_HEAD:refs/heads/main"
+  clear_pending_marker
+  REMOTE_HEAD="$LOCAL_HEAD"
+elif git -C "$DASHBOARD_DIR" merge-base --is-ancestor "$LOCAL_HEAD" "$REMOTE_HEAD"; then
+  fail 'dashboard main is behind origin/main; update it explicitly before publishing'
+else
+  fail 'dashboard main has diverged from origin/main; reconcile it explicitly before publishing'
 fi
 
-export RENTAL_HOUSING_DB_PATH="${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}"
-if [ ! -f "$RENTAL_HOUSING_DB_PATH" ]; then
-  fail "housing database file not found: $RENTAL_HOUSING_DB_PATH"
-fi
-
+BASELINE_HEAD="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
+DATABASE_INPUT="${RENTAL_HOUSING_DB_PATH:-$STATE_DIR/rental-housing.db}"
+[ -f "$DATABASE_INPUT" ] || fail "housing database file not found: $DATABASE_INPUT"
+RENTAL_HOUSING_DB_PATH="$(readlink -f -- "$DATABASE_INPUT")" || fail "housing database path cannot be resolved: $DATABASE_INPUT"
+export RENTAL_HOUSING_DB_PATH
 select_linux_node
 
 BACKUP_FEED="$(mktemp "$GIT_DIR/housing-feed-backup.XXXXXX")"
@@ -178,28 +276,32 @@ if [ -L "$TEMP_FEED" ] || [ ! -f "$TEMP_FEED" ]; then
   fail 'public feed exporter did not produce a regular file'
 fi
 chmod --reference="$FEED_PATH" "$TEMP_FEED"
+EXPORTED_FILE_MODE="$(stat -c %a "$TEMP_FEED")"
+EXPORTED_HASH="$(feed_hash "$TEMP_FEED")"
+EXPORTED_GIT_OID="$(git -C "$DASHBOARD_DIR" hash-object --no-filters "$TEMP_FEED")"
 FEED_REPLACED=1
 mv -f -- "$TEMP_FEED" "$FEED_PATH"
 TEMP_FEED=''
 
 "$NPM_BIN" --prefix "$DASHBOARD_DIR" run build:public-dashboard
+validate_repository_identity
+validate_exported_feed
 
 UNSTAGED_PATHS="$(git -C "$DASHBOARD_DIR" diff --name-only)"
 STAGED_PATHS="$(git -C "$DASHBOARD_DIR" diff --cached --name-only)"
 UNTRACKED_PATHS="$(git -C "$DASHBOARD_DIR" ls-files --others --exclude-standard)"
-if { [ -n "$UNSTAGED_PATHS" ] && [ "$UNSTAGED_PATHS" != "$FEED_RELATIVE_PATH" ]; } \
-  || [ -n "$STAGED_PATHS" ] \
-  || [ -n "$UNTRACKED_PATHS" ]; then
+if { [ -n "$UNSTAGED_PATHS" ] && [ "$UNSTAGED_PATHS" != "$FEED_RELATIVE_PATH" ]; } || [ -n "$STAGED_PATHS" ] || [ -n "$UNTRACKED_PATHS" ]; then
   fail 'dashboard build changed or staged files other than the public housing feed'
 fi
 
 git -C "$DASHBOARD_DIR" add -- "$FEED_RELATIVE_PATH"
+validate_repository_identity
+validate_exported_feed
+[ "$(git -C "$DASHBOARD_DIR" rev-parse ":$FEED_RELATIVE_PATH")" = "$EXPORTED_GIT_OID" ] || fail 'staged public housing feed does not match the exported artifact'
 STAGED_PATHS="$(git -C "$DASHBOARD_DIR" diff --cached --name-only)"
 UNSTAGED_PATHS="$(git -C "$DASHBOARD_DIR" diff --name-only)"
 UNTRACKED_PATHS="$(git -C "$DASHBOARD_DIR" ls-files --others --exclude-standard)"
-if [ -n "$UNSTAGED_PATHS" ] \
-  || [ -n "$UNTRACKED_PATHS" ] \
-  || { [ -n "$STAGED_PATHS" ] && [ "$STAGED_PATHS" != "$FEED_RELATIVE_PATH" ]; }; then
+if [ -n "$UNSTAGED_PATHS" ] || [ -n "$UNTRACKED_PATHS" ] || { [ -n "$STAGED_PATHS" ] && [ "$STAGED_PATHS" != "$FEED_RELATIVE_PATH" ]; }; then
   fail 'public housing feed is not the sole dashboard change'
 fi
 
@@ -210,4 +312,21 @@ fi
 
 git -C "$DASHBOARD_DIR" commit --only -m "$AUTOMATION_COMMIT_SUBJECT" -- "$FEED_RELATIVE_PATH"
 COMMIT_CREATED=1
-GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" push origin HEAD:main
+PUBLISH_COMMIT="$(git -C "$DASHBOARD_DIR" rev-parse HEAD)"
+[ "$(git -C "$DASHBOARD_DIR" rev-parse "$PUBLISH_COMMIT^")" = "$BASELINE_HEAD" ] || fail 'dashboard automation commit parent changed unexpectedly'
+[ "$(git -C "$DASHBOARD_DIR" show -s --format=%s "$PUBLISH_COMMIT")" = "$AUTOMATION_COMMIT_SUBJECT" ] || fail 'dashboard automation commit subject changed unexpectedly'
+[ "$(git -C "$DASHBOARD_DIR" diff-tree --no-commit-id --name-only -r "$PUBLISH_COMMIT")" = "$FEED_RELATIVE_PATH" ] || fail 'dashboard automation commit changed more than the public housing feed'
+[ "$(git -C "$DASHBOARD_DIR" rev-parse "$PUBLISH_COMMIT:$FEED_RELATIVE_PATH")" = "$EXPORTED_GIT_OID" ] || fail 'committed public housing feed does not match the exported artifact'
+[ "$(git -C "$DASHBOARD_DIR" ls-tree "$PUBLISH_COMMIT" -- "$FEED_RELATIVE_PATH" | awk '{ print $1 }')" = "$BASELINE_TRACKED_MODE" ] || fail 'committed public housing feed mode changed unexpectedly'
+validate_exported_feed
+write_pending_marker "$PUBLISH_COMMIT"
+
+[ "$(git -C "$DASHBOARD_DIR" symbolic-ref --quiet --short HEAD || true)" = "main" ] || fail 'dashboard branch changed before push'
+[ "$(git -C "$DASHBOARD_DIR" rev-parse HEAD)" = "$PUBLISH_COMMIT" ] || fail 'dashboard HEAD changed before push'
+if [ "$(git -C "$DASHBOARD_DIR" remote get-url origin)" != "$ORIGIN_FETCH_URL" ] || [ "$(git -C "$DASHBOARD_DIR" remote get-url --push origin)" != "$ORIGIN_PUSH_URL" ]; then
+  fail 'dashboard origin URL changed before push'
+fi
+GIT_TERMINAL_PROMPT=0 git -C "$DASHBOARD_DIR" push \
+  --force-with-lease="refs/heads/main:$REMOTE_HEAD" \
+  origin "$PUBLISH_COMMIT:refs/heads/main"
+clear_pending_marker

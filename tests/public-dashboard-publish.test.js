@@ -1,5 +1,5 @@
-import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, statSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,23 @@ afterEach(() => {
 });
 function git(cwd, ...args) {
     return execFileSync('/usr/bin/git', args, { cwd, encoding: 'utf8' }).trim();
+}
+function waitFor(condition, description) {
+    const sleeper = new Int32Array(new SharedArrayBuffer(4));
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+        if (condition())
+            return;
+        Atomics.wait(sleeper, 0, 0, 10);
+    }
+    throw new Error(`timed out waiting for ${description}`);
+}
+function pendingMarkerPath(fixture) {
+    return join(git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir'), 'housing-publish.pending');
+}
+function writePendingMarker(fixture, oid) {
+    const marker = pendingMarkerPath(fixture);
+    writeFileSync(marker, `${oid}\n`, { mode: 0o600 });
+    chmodSync(marker, 0o600);
 }
 function createFixture(feed = '{"notices":[]}\n') {
     const rootDirectory = mkdtempSync(join(tmpdir(), 'housing-publish-'));
@@ -46,8 +63,11 @@ if [ "\${1:-}" = "run" ] && [ "\${2:-}" = "collect:notify" ]; then
   if [ "\${STUB_FAIL_STAGE:-}" = "collect" ]; then
     exit 72
   fi
-elif [ "\${1:-}" = "run" ] && [ "\${2:-}" = "export:public-feed" ]; then
-  printf '%s\\n' "\${STUB_FEED_CONTENT:?}" > "\${PUBLIC_FEED_PATH:?}"
+	elif [ "\${1:-}" = "run" ] && [ "\${2:-}" = "export:public-feed" ]; then
+	  if [ -n "\${STUB_DB_RECORD:-}" ]; then
+	    printf '%s\\n' "\${RENTAL_HOUSING_DB_PATH:-}" > "\${STUB_DB_RECORD}"
+	  fi
+	  printf '%s\\n' "\${STUB_FEED_CONTENT:?}" > "\${PUBLIC_FEED_PATH:?}"
   if [ "\${STUB_FAIL_STAGE:-}" = "export" ]; then
     exit 70
   fi
@@ -57,9 +77,49 @@ elif [ "\${1:-}" = "--prefix" ] && [ "\${3:-}" = "run" ] && [ "\${4:-}" = "build
     printf 'changed by build\\n' > "\${2}/keep.txt"
     /usr/bin/git -C "\${2}" add -- keep.txt
   fi
-  if [ "\${STUB_FAIL_STAGE:-}" = "build" ]; then
-    exit 71
-  fi
+	if [ "\${STUB_FAIL_STAGE:-}" = "build" ]; then
+	  exit 71
+	fi
+	case "\${STUB_BUILD_MUTATION:-}" in
+	  feed-content)
+	    printf 'tampered by build\\n' > "\${2}/public/public-feed.json"
+	    ;;
+	  feed-symlink)
+	    printf 'outside stays unchanged\\n' > "\${STUB_SYMLINK_TARGET:?}"
+	    rm -f -- "\${2}/public/public-feed.json"
+	    ln -s "\${STUB_SYMLINK_TARGET}" "\${2}/public/public-feed.json"
+	    ;;
+	  feed-mode)
+	    chmod +x "\${2}/public/public-feed.json"
+	    ;;
+	  branch)
+	    /usr/bin/git -C "\${2}" switch -q -c build-mutated
+	    ;;
+	  commit)
+	    /usr/bin/git -C "\${2}" add -- public/public-feed.json
+	    /usr/bin/git -C "\${2}" commit -q -m 'build mutation commit'
+	    ;;
+	  remote)
+	    /usr/bin/git -C "\${2}" remote set-url origin "\${STUB_ALT_REMOTE:?}"
+	    ;;
+	  remote-rewind)
+	    /usr/bin/git --git-dir="\${STUB_REMOTE_DIRECTORY:?}" update-ref refs/heads/main "\${STUB_REMOTE_REWIND_OID:?}"
+	    ;;
+	  public-symlink)
+	    mv "\${2}/public" "\${2}/public-real"
+	    ln -s public-real "\${2}/public"
+	    ;;
+	  rollback-blocked)
+	    chmod 0444 "\${2}/public/public-feed.json"
+	    chmod 0555 "\${2}/public"
+	    exit 71
+	    ;;
+	  feed-directory)
+	    rm -f -- "\${2}/public/public-feed.json"
+	    mkdir "\${2}/public/public-feed.json"
+	    exit 71
+	    ;;
+	esac
 else
   printf 'unexpected npm command: %s\\n' "$*" >&2
   exit 64
@@ -171,6 +231,33 @@ describe('public dashboard publisher', () => {
         });
         expect(result.status, result.stderr).toBe(0);
         expect(readFileSync(join(fixture.dashboardDirectory, 'public', 'public-feed.json'), 'utf8')).toBe(nextFeed);
+    });
+    test('canonicalizes a relative Linux node bin directory before changing directory', () => {
+        const fixture = createFixture();
+        const nextFeed = '{"notices":[{"id":"relative-bin"}]}\n';
+        const environment = scriptEnvironment(fixture, nextFeed);
+        environment.HOUSING_NODE_BIN_DIR = 'bin';
+        const result = spawnSync('/usr/bin/bash', [publishScript], {
+            cwd: fixture.rootDirectory,
+            encoding: 'utf8',
+            env: environment,
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(join(fixture.dashboardDirectory, 'public', 'public-feed.json'), 'utf8')).toBe(nextFeed);
+    });
+    test('canonicalizes a relative database path before changing directory', () => {
+        const fixture = createFixture();
+        const databaseRecord = join(fixture.rootDirectory, 'database-record.txt');
+        const environment = scriptEnvironment(fixture, '{"notices":[]}\n');
+        environment.RENTAL_HOUSING_DB_PATH = 'rental-housing.db';
+        environment.STUB_DB_RECORD = databaseRecord;
+        const result = spawnSync('/usr/bin/bash', [publishScript], {
+            cwd: fixture.rootDirectory,
+            encoding: 'utf8',
+            env: environment,
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(databaseRecord, 'utf8')).toBe(`${join(fixture.rootDirectory, 'rental-housing.db')}\n`);
     });
     test('refuses a dirty dashboard before exporting', () => {
         const fixture = createFixture();
@@ -313,12 +400,12 @@ describe('publisher repository safety', () => {
         const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
         const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
         expect(result.status).not.toBe(0);
-        expect(result.stderr).toContain('non-automation');
+        expect(result.stderr).toContain('pending');
         expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(headBefore);
         expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
         expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
     });
-    test('retries an unpushed automation-only feed commit before unchanged export', () => {
+    test('refuses an unmarked automation-looking commit ahead of origin main', () => {
         const fixture = createFixture();
         const feed = '{"notices":[{"id":"pending"}]}\n';
         const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
@@ -327,9 +414,71 @@ describe('publisher repository safety', () => {
         git(fixture.dashboardDirectory, 'commit', '-m', 'data: update public housing notices');
         const pendingHead = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
         const result = runPublisher(fixture, feed);
-        expect(result.status, result.stderr).toBe(0);
-        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(pendingHead);
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('pending');
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).not.toBe(pendingHead);
         expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD')).toBe(pendingHead);
+    });
+    test('records a rejected push and retries only the marked automation commit', () => {
+        const fixture = createFixture();
+        const feed = '{"notices":[{"id":"pending"}]}\n';
+        const remoteBefore = git(fixture.remoteDirectory, 'rev-parse', 'main');
+        const rejectFlag = join(fixture.remoteDirectory, 'reject-push');
+        const hookPath = join(fixture.remoteDirectory, 'hooks', 'pre-receive');
+        writeFileSync(hookPath, '#!/usr/bin/env bash\nif [ -f "$(dirname "$0")/../reject-push" ]; then exit 1; fi\n');
+        chmodSync(hookPath, 0o755);
+        writeFileSync(rejectFlag, 'reject\n');
+        const rejected = runPublisher(fixture, feed);
+        expect(rejected.status).not.toBe(0);
+        const pendingHead = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+        const marker = pendingMarkerPath(fixture);
+        expect(pendingHead).not.toBe(remoteBefore);
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
+        expect(readFileSync(marker, 'utf8')).toBe(`${pendingHead}\n`);
+        expect(statSync(marker).mode & 0o777).toBe(0o600);
+        rmSync(rejectFlag);
+        const retry = runPublisher(fixture, feed);
+        expect(retry.status, retry.stderr).toBe(0);
+        expect(existsSync(marker)).toBe(false);
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(pendingHead);
+        expect(git(fixture.dashboardDirectory, 'rev-list', '--count', `${remoteBefore}..HEAD`)).toBe('1');
+    });
+    test('refuses a pending marker that does not name HEAD', () => {
+        const fixture = createFixture();
+        const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+        writeFileSync(feedPath, '{"notices":[{"id":"pending"}]}\n');
+        git(fixture.dashboardDirectory, 'add', 'public/public-feed.json');
+        git(fixture.dashboardDirectory, 'commit', '-m', 'data: update public housing notices');
+        writePendingMarker(fixture, '0000000000000000000000000000000000000000');
+        const remoteBefore = git(fixture.remoteDirectory, 'rev-parse', 'main');
+        const result = runPublisher(fixture, '{"notices":[{"id":"pending"}]}\n');
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('pending');
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
+    });
+    test('refuses more than one marked automation commit ahead of origin main', () => {
+        const fixture = createFixture();
+        const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+        for (const id of ['one', 'two']) {
+            writeFileSync(feedPath, `{"notices":[{"id":"${id}"}]}\n`);
+            git(fixture.dashboardDirectory, 'add', 'public/public-feed.json');
+            git(fixture.dashboardDirectory, 'commit', '-m', 'data: update public housing notices');
+        }
+        const pendingHead = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+        writePendingMarker(fixture, pendingHead);
+        const remoteBefore = git(fixture.remoteDirectory, 'rev-parse', 'main');
+        const result = runPublisher(fixture, '{"notices":[{"id":"two"}]}\n');
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('single allowed');
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
+    });
+    test('clears a stale pending marker when origin main already equals HEAD', () => {
+        const fixture = createFixture();
+        const marker = pendingMarkerPath(fixture);
+        writePendingMarker(fixture, '0000000000000000000000000000000000000000');
+        const result = runPublisher(fixture, '{"notices":[]}\n');
+        expect(result.status, result.stderr).toBe(0);
+        expect(existsSync(marker)).toBe(false);
     });
     test.each(['behind', 'diverged'])('refuses a %s main before mutating the feed', (repositoryState) => {
         const fixture = createFixture();
@@ -405,16 +554,155 @@ describe('publisher repository safety', () => {
         expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
         expect(git(fixture.dashboardDirectory, 'diff', '--cached', '--name-only')).toBe('keep.txt');
     });
-    test('refuses a concurrent publisher lock scoped to the dashboard', () => {
+    test('never pushes feed content replaced by a concurrent commit hook', () => {
+        const fixture = createFixture();
+        const remoteBefore = git(fixture.remoteDirectory, 'rev-parse', 'main');
+        const hookPath = join(fixture.dashboardDirectory, '.git', 'hooks', 'pre-commit');
+        writeFileSync(hookPath, '#!/usr/bin/env bash\nprintf \'tampered during commit\\n\' > public/public-feed.json\ngit add -- public/public-feed.json\n');
+        chmodSync(hookPath, 0o755);
+        const result = runPublisher(fixture, '{"notices":[{"id":"verified"}]}\n');
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('artifact');
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
+        expect(existsSync(pendingMarkerPath(fixture))).toBe(false);
+    });
+    test('retains the standalone backup when an atomic feed rollback cannot start', () => {
         const fixture = createFixture();
         const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
         const feedBefore = readFileSync(feedPath, 'utf8');
         const gitDirectory = git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir');
-        mkdirSync(join(gitDirectory, 'housing-publish.lock'));
-        const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+        const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n', {
+            STUB_BUILD_MUTATION: 'rollback-blocked',
+        });
+        chmodSync(join(fixture.dashboardDirectory, 'public'), 0o755);
+        chmodSync(feedPath, 0o644);
+        const backups = readdirSync(gitDirectory).filter((name) => name.startsWith('housing-feed-backup.'));
         expect(result.status).not.toBe(0);
-        expect(result.stderr).toContain('already running');
+        expect(result.stderr).toContain('backup retained');
+        expect(backups).toHaveLength(1);
+        expect(readFileSync(join(gitDirectory, backups[0]), 'utf8')).toBe(feedBefore);
+    });
+    test('does not mistake a feed directory for a successful atomic rollback', () => {
+        const fixture = createFixture();
+        const gitDirectory = git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir');
+        const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n', {
+            STUB_BUILD_MUTATION: 'feed-directory',
+        });
+        const backups = readdirSync(gitDirectory).filter((name) => name.startsWith('housing-feed-backup.'));
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('backup retained');
+        expect(backups).toHaveLength(1);
+        expect(lstatSync(join(fixture.dashboardDirectory, 'public', 'public-feed.json')).isDirectory()).toBe(true);
+    });
+    test.each([
+        'feed-content',
+        'feed-symlink',
+        'feed-mode',
+        'branch',
+        'commit',
+        'remote',
+        'public-symlink',
+    ])('rejects a %s mutation made by the dashboard build', (mutation) => {
+        const fixture = createFixture();
+        const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+        const feedBefore = readFileSync(feedPath, 'utf8');
+        const headBefore = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+        const remoteBefore = git(fixture.remoteDirectory, 'rev-parse', 'main');
+        const outsidePath = join(fixture.rootDirectory, 'outside-feed.json');
+        const alternateRemote = join(fixture.rootDirectory, 'alternate.git');
+        git(fixture.rootDirectory, 'init', '--bare', '--initial-branch=main', alternateRemote);
+        const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n', {
+            STUB_ALT_REMOTE: alternateRemote,
+            STUB_BUILD_MUTATION: mutation,
+            STUB_SYMLINK_TARGET: outsidePath,
+        });
+        expect(result.status).not.toBe(0);
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(remoteBefore);
+        expect(git(fixture.dashboardDirectory, 'rev-parse', 'HEAD') === headBefore).toBe(mutation !== 'commit');
+        if (mutation !== 'commit' && mutation !== 'public-symlink') {
+            expect(lstatSync(feedPath).isSymbolicLink()).toBe(false);
+            expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
+            expect(git(fixture.dashboardDirectory, 'diff', '--cached', '--', 'public/public-feed.json')).toBe('');
+        }
+        if (mutation === 'remote') {
+            expect(git(fixture.dashboardDirectory, 'remote', 'get-url', 'origin')).toBe(alternateRemote);
+            expect(() => git(alternateRemote, 'rev-parse', 'main')).toThrow();
+        }
+    });
+    test('pins the final push to a captured commit object id', () => {
+        const source = readFileSync(publishScript, 'utf8');
+        expect(source.match(/--force-with-lease="refs\/heads\/main:\$REMOTE_HEAD"/g)).toHaveLength(2);
+        expect(source).toContain('origin "$PUBLISH_COMMIT:refs/heads/main"');
+        expect(source).toContain('origin "$LOCAL_HEAD:refs/heads/main"');
+        expect(source).not.toContain('push origin HEAD:main');
+    });
+    test('does not resurrect remote history rewound after fetch', () => {
+        const fixture = createFixture();
+        const rewindTarget = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+        writeFileSync(join(fixture.dashboardDirectory, 'keep.txt'), 'second baseline\n');
+        git(fixture.dashboardDirectory, 'add', 'keep.txt');
+        git(fixture.dashboardDirectory, 'commit', '-m', 'second dashboard baseline');
+        git(fixture.dashboardDirectory, 'push', 'origin', 'main');
+        const fetchedBaseline = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+        const result = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n', {
+            STUB_BUILD_MUTATION: 'remote-rewind',
+            STUB_REMOTE_DIRECTORY: fixture.remoteDirectory,
+            STUB_REMOTE_REWIND_OID: rewindTarget,
+        });
+        expect(result.status).not.toBe(0);
+        expect(git(fixture.remoteDirectory, 'rev-parse', 'main')).toBe(rewindTarget);
+        const pendingHead = git(fixture.dashboardDirectory, 'rev-parse', 'HEAD');
+        expect(pendingHead).not.toBe(fetchedBaseline);
+        expect(readFileSync(pendingMarkerPath(fixture), 'utf8')).toBe(`${pendingHead}\n`);
+    });
+    test('ignores a stale legacy lock directory', () => {
+        const fixture = createFixture();
+        const gitDirectory = git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir');
+        mkdirSync(join(gitDirectory, 'housing-publish.lock'));
+        const result = runPublisher(fixture, '{"notices":[]}\n');
+        expect(result.status, result.stderr).toBe(0);
+    });
+    test('rejects a symlink publisher lock without truncating its target', () => {
+        const fixture = createFixture();
+        const gitDirectory = git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir');
+        const lockTarget = join(fixture.rootDirectory, 'lock-target.txt');
+        writeFileSync(lockTarget, 'must remain intact\n');
+        symlinkSync(lockTarget, join(gitDirectory, 'housing-publish.flock'));
+        const result = runPublisher(fixture, '{"notices":[]}\n');
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('lock endpoint');
+        expect(readFileSync(lockTarget, 'utf8')).toBe('must remain intact\n');
+    });
+    test('rejects a FIFO publisher lock without blocking', () => {
+        const fixture = createFixture();
+        const gitDirectory = git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir');
+        execFileSync('/usr/bin/mkfifo', [join(gitDirectory, 'housing-publish.flock')]);
+        const result = spawnSync('/usr/bin/bash', [publishScript], {
+            encoding: 'utf8',
+            env: scriptEnvironment(fixture, '{"notices":[]}\n'),
+            timeout: 500,
+        });
+        expect(result.signal).toBeNull();
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('lock endpoint');
+    });
+    test('blocks only while the dashboard flock is held and reuses the released lock file', () => {
+        const fixture = createFixture();
+        const feedPath = join(fixture.dashboardDirectory, 'public', 'public-feed.json');
+        const feedBefore = readFileSync(feedPath, 'utf8');
+        const gitDirectory = git(fixture.dashboardDirectory, 'rev-parse', '--absolute-git-dir');
+        const lockPath = join(gitDirectory, 'housing-publish.flock');
+        const readyPath = join(fixture.rootDirectory, 'lock-ready');
+        const holder = spawn('/usr/bin/bash', ['-c', 'exec 9>"$1"; /usr/bin/flock -n 9; printf ready > "$2"; read -r', 'bash', lockPath, readyPath], { stdio: ['pipe', 'ignore', 'pipe'] });
+        waitFor(() => existsSync(readyPath), 'publisher lock holder');
+        const blocked = runPublisher(fixture, '{"notices":[{"id":"new"}]}\n');
+        expect(blocked.status).not.toBe(0);
+        expect(blocked.stderr).toContain('already running');
         expect(readFileSync(feedPath, 'utf8')).toBe(feedBefore);
-        expect(git(fixture.dashboardDirectory, 'log', '--format=%s')).toBe('initial dashboard');
+        holder.kill('SIGTERM');
+        waitFor(() => spawnSync('/usr/bin/flock', ['-n', lockPath, '/usr/bin/true']).status === 0, 'publisher lock release');
+        const released = runPublisher(fixture, '{"notices":[]}\n');
+        expect(released.status, released.stderr).toBe(0);
+        expect(existsSync(lockPath)).toBe(true);
     });
 });
