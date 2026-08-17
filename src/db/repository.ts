@@ -172,6 +172,9 @@ export const createRepository = (filename: string, database = createDatabase(fil
 
   const repository = {
     db: database,
+    withTransaction<T>(operation: () => T): T {
+      return database.transaction(operation)();
+    },
     upsertNotice(notice: Notice) {
       upsertNoticeStatement.run({
         source: notice.source,

@@ -70,6 +70,20 @@ describe('sqlite repository', () => {
         const repository = createRepository(':memory:');
         expect(repository.queryNotices({})).toEqual([]);
     });
+    it('commits successful and nested repository transactions', () => {
+        const repository = createRepository(':memory:');
+        const result = repository.withTransaction(() => {
+            repository.upsertNotice(makeNotice({ sourceId: 'outer', stableKey: 'notice:lh:outer' }));
+            return repository.withTransaction(() => {
+                repository.upsertNotice(makeNotice({ sourceId: 'inner', stableKey: 'notice:lh:inner' }));
+                return 'committed';
+            });
+        });
+        expect(result).toBe('committed');
+        expect(repository.findNoticeBySourceId('lh', 'outer')).not.toBeNull();
+        expect(repository.findNoticeBySourceId('lh', 'inner')).not.toBeNull();
+        repository.close();
+    });
     it('inserts and fetches notices and listings', () => {
         const repository = createRepository(':memory:');
         const notice = makeNotice();
@@ -279,6 +293,68 @@ describe('sqlite repository', () => {
             listingStableKey: secondRun.events[0]?.listing?.stableKey,
             changeHash: secondRun.events[0]?.listing?.changeHash,
         });
+    });
+    it('rolls back one failed source without discarding a later successful source', async () => {
+        const repository = createRepository(':memory:');
+        const lhAdapter = {
+            source: 'lh',
+            async fetchNotices() {
+                return [
+                    {
+                        sourceId: 'lh-1',
+                        title: 'LH first notice',
+                        region: '서울특별시',
+                        listings: [{ title: 'LH first listing', region: '서울특별시' }],
+                    },
+                    {
+                        sourceId: 'lh-2',
+                        title: 'LH second notice',
+                        region: '서울특별시',
+                        listings: [{ title: 'LH second listing', region: '서울특별시' }],
+                    },
+                ];
+            },
+        };
+        const shAdapter = {
+            source: 'sh',
+            async fetchNotices() {
+                return [
+                    {
+                        sourceId: 'sh-1',
+                        title: 'SH notice',
+                        region: '서울특별시',
+                        listings: [{ title: 'SH listing', region: '서울특별시' }],
+                    },
+                ];
+            },
+        };
+        const upsertListing = repository.upsertListing.bind(repository);
+        let lhListingWrites = 0;
+        repository.upsertListing = (listing) => {
+            if (listing.source === 'lh' && ++lhListingWrites === 2) {
+                throw new Error('second LH listing failed');
+            }
+            upsertListing(listing);
+        };
+        const result = await runCollect({ adapters: [lhAdapter, shAdapter], repository });
+        expect(result.successfulSourceCount).toBe(1);
+        expect(result.failures).toEqual([{ source: 'lh', message: 'second LH listing failed' }]);
+        expect(result.events).toHaveLength(1);
+        expect(result.events[0]).toMatchObject({
+            type: 'new_notice',
+            notice: expect.objectContaining({ source: 'sh', sourceId: 'sh-1' }),
+        });
+        expect(repository.findNoticeBySourceId('lh', 'lh-1')).toBeNull();
+        expect(repository.findNoticeBySourceId('lh', 'lh-2')).toBeNull();
+        expect(repository.queryListingsByNotice('lh', 'lh-1')).toEqual([]);
+        expect(repository.queryListingsByNotice('lh', 'lh-2')).toEqual([]);
+        expect(repository.findNoticeBySourceId('sh', 'sh-1')).not.toBeNull();
+        expect(repository.queryListingsByNotice('sh', 'sh-1')).toHaveLength(1);
+        expect(repository.listSourceRuns()).toMatchObject([
+            { source: 'lh', status: 'failure', message: 'second LH listing failed' },
+            { source: 'sh', status: 'success', message: null },
+        ]);
+        repository.close();
     });
     it('prefers adapter detail output when a notice has detailed listings', async () => {
         const repository = createRepository(':memory:');

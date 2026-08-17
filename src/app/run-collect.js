@@ -132,35 +132,40 @@ export const runCollect = async ({ adapters, repository, regions = DEFAULT_COLLE
             failures.push(...detailResult.failures);
             const detailedNotices = await hydrateNoticeDocumentTexts(detailResult.notices, withTimeoutFetch(documentFetch, DOCUMENT_FETCH_TIMEOUT_MS));
             const { notices, listings } = normalizeAdapterOutput({ source: adapter.source, notices: detailedNotices });
-            for (const notice of notices) {
-                const incomingListings = listings.filter((listing) => listing.source === notice.source && listing.noticeSourceId === notice.sourceId);
-                const existingNotice = repository.findNoticeBySourceId(notice.source, notice.sourceId);
-                const existingListings = repository.queryListingsByNotice(notice.source, notice.sourceId);
-                const diffEvents = diffNoticeAndListings({
-                    incomingNotice: notice,
-                    incomingListings,
-                    existingNotice,
-                    existingListings,
-                });
-                repository.upsertNotice(notice);
-                for (const listing of incomingListings) {
-                    repository.upsertListing(listing);
-                }
-                repository.deleteStaleListingsByNotice(notice.source, notice.sourceId, incomingListings.map((listing) => listing.stableKey));
-                for (const event of diffEvents) {
-                    if (event.listing && shouldSnapshotListingEvent(event)) {
-                        repository.insertListingSnapshot(event.listing);
+            const sourceEvents = repository.withTransaction(() => {
+                const stagedEvents = [];
+                for (const notice of notices) {
+                    const incomingListings = listings.filter((listing) => listing.source === notice.source && listing.noticeSourceId === notice.sourceId);
+                    const existingNotice = repository.findNoticeBySourceId(notice.source, notice.sourceId);
+                    const existingListings = repository.queryListingsByNotice(notice.source, notice.sourceId);
+                    const diffEvents = diffNoticeAndListings({
+                        incomingNotice: notice,
+                        incomingListings,
+                        existingNotice,
+                        existingListings,
+                    });
+                    repository.upsertNotice(notice);
+                    for (const listing of incomingListings) {
+                        repository.upsertListing(listing);
                     }
+                    repository.deleteStaleListingsByNotice(notice.source, notice.sourceId, incomingListings.map((listing) => listing.stableKey));
+                    for (const event of diffEvents) {
+                        if (event.listing && shouldSnapshotListingEvent(event)) {
+                            repository.insertListingSnapshot(event.listing);
+                        }
+                    }
+                    stagedEvents.push(...diffEvents);
                 }
-                events.push(...diffEvents);
-            }
-            repository.recordSourceRun({
-                source: adapter.source,
-                startedAt,
-                finishedAt: new Date().toISOString(),
-                status: detailResult.failures.length > 0 ? 'partial' : 'success',
-                message: detailResult.failures.length > 0 ? `상세 수집 실패 ${detailResult.failures.length}건` : null,
+                repository.recordSourceRun({
+                    source: adapter.source,
+                    startedAt,
+                    finishedAt: new Date().toISOString(),
+                    status: detailResult.failures.length > 0 ? 'partial' : 'success',
+                    message: detailResult.failures.length > 0 ? `상세 수집 실패 ${detailResult.failures.length}건` : null,
+                });
+                return stagedEvents;
             });
+            events.push(...sourceEvents);
             successfulSourceCount += 1;
         }
         catch (error) {

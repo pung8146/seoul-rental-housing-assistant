@@ -95,6 +95,9 @@ export const createRepository = (filename, database = createDatabase(filename)) 
     const deleteStaleListingsByNoticeStatement = database.prepare('DELETE FROM listings WHERE source = ? AND notice_source_id = ? AND stable_key NOT IN (SELECT value FROM json_each(?))');
     const repository = {
         db: database,
+        withTransaction(operation) {
+            return database.transaction(operation)();
+        },
         upsertNotice(notice) {
             upsertNoticeStatement.run({
                 source: notice.source,
