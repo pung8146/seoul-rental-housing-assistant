@@ -1,0 +1,61 @@
+name: Update public dashboard feed
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:00 KST every day
+    - cron: "0 21 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  update-public-feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DASHBOARD_REPO: pung8146/rental-housing-assistant-public-dashboard
+    steps:
+      - name: Checkout collector
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build collector
+        run: npm run build
+
+      - name: Collect notices
+        run: npm run collect
+
+      - name: Export public feed
+        run: npm run export:public-feed
+
+      - name: Checkout dashboard repo
+        env:
+          DASHBOARD_REPO_TOKEN: ${{ secrets.DASHBOARD_REPO_TOKEN }}
+        run: |
+          test -n "$DASHBOARD_REPO_TOKEN"
+          git clone "https://x-access-token:${DASHBOARD_REPO_TOKEN}@github.com/${DASHBOARD_REPO}.git" ../public-dashboard
+
+      - name: Update dashboard feed
+        run: cp public/public-feed.json ../public-dashboard/public/public-feed.json
+
+      - name: Commit and push dashboard feed
+        working-directory: ../public-dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/public-feed.json
+          if git diff --cached --quiet; then
+            echo "No public feed changes."
+            exit 0
+          fi
+          git commit -m "공개 피드 자동 갱신"
+          git push origin HEAD:main
